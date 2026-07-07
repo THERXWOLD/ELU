@@ -49,6 +49,10 @@
 !cmd/
 !cmd/**
 
+# Generated assets (repo stats SVG cards)
+!.assets/
+!.assets/**
+
 # Examples and tooling
 !examples/
 !examples/**
