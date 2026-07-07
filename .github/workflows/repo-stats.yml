@@ -14,3 +14,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           REPO_OWNER: THERXWOLD
           REPO_NAME: ELU
+          COMMIT_BY_ME: True
