@@ -1,3 +1,7 @@
+// Package value defines the universal runtime value type for ELU.
+// Everything in ELU — config values, policy data, condition results —
+// eventually becomes a Value. It's the One Type To Rule Them All,
+// and yes, I'm dramatic about it.
 package value
 
 import (
@@ -12,13 +16,20 @@ import (
 type Kind string
 
 const (
-	Null   Kind = "null"
+	// Null — the absence of value. Philosophically deep, practically empty.
+	Null Kind = "null"
+	// String — text, words, sentences, the usual.
 	String Kind = "string"
-	Bool   Kind = "bool"
-	Int    Kind = "int"
-	Float  Kind = "float"
-	Map    Kind = "map"
-	List   Kind = "list"
+	// Bool — true or false, no maybe.
+	Bool Kind = "bool"
+	// Int — whole numbers, for when you need to count.
+	Int Kind = "int"
+	// Float — numbers with decimal points. Precision is a lie.
+	Float Kind = "float"
+	// Map — key-value pairs, the workhorse of structured data.
+	Map Kind = "map"
+	// List — ordered collection. Order matters, obviously.
+	List Kind = "list"
 )
 
 // bareIdentRE matches strings that can be used as bare identifiers in ELU.
@@ -44,7 +55,7 @@ type Value struct {
 // VString wraps a string into a Value. Boring but essential.
 func VString(s string) Value { return Value{Kind: String, S: s} }
 
-// VBool wraps a bool into a Value. true or false, nothing tricky.
+// VBool wraps a bool into a Value. True or false, nothing tricky.
 func VBool(b bool) Value { return Value{Kind: Bool, B: b} }
 
 // VInt wraps an int64 into a Value. For when you need to count things.

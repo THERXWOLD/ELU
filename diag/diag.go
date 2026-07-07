@@ -11,7 +11,9 @@ import (
 type Severity string
 
 const (
-	Error   Severity = "error"
+	// Error — hard failure. The thing is broken. Don't try to use it.
+	Error Severity = "error"
+	// Warning — advisory. It might work but you're living dangerously.
 	Warning Severity = "warning"
 )
 
@@ -27,6 +29,7 @@ type Diagnostic struct {
 }
 
 // String renders a diagnostic the way you'd expect: file:line:col: severity: message.
+// If there's no location, it falls back to just "severity: message".
 func (d Diagnostic) String() string {
 	loc := d.File
 	if d.Line > 0 {

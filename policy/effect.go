@@ -7,11 +7,16 @@ package policy
 type Effect string
 
 const (
-	EffectAllow    Effect = "allow"
-	EffectPropose  Effect = "propose"
+	// EffectAllow — let it through, no friction, no fuss.
+	EffectAllow Effect = "allow"
+	// EffectPropose — suggest it, but someone needs to sign off.
+	EffectPropose Effect = "propose"
+	// EffectApproval — needs explicit approval before anything happens.
 	EffectApproval Effect = "approval"
-	EffectDeny     Effect = "deny"
-	EffectNever    Effect = "never"
+	// EffectDeny — nope. Shut it down.
+	EffectDeny Effect = "deny"
+	// EffectNever — strongest possible no. Not now, not ever.
+	EffectNever Effect = "never"
 )
 
 // IsEffect returns true if the string is a valid effect keyword.
@@ -29,6 +34,7 @@ func IsEffect(s string) bool {
 func Stronger(a, b Effect) bool { return Rank(a) > Rank(b) }
 
 // IsSeverity checks if a string is a valid risk severity level.
+// Valid levels: low, medium, high, critical.
 func IsSeverity(s string) bool {
 	switch s {
 	case "low", "medium", "high", "critical":
@@ -39,7 +45,8 @@ func IsSeverity(s string) bool {
 }
 
 // Rank assigns a numeric rank to each effect for comparison.
-// Higher number = stronger effect.
+// Higher number = stronger effect. Never is 5, Allow is 1.
+// Zero means "I don't know what this effect is".
 func Rank(e Effect) int {
 	switch e {
 	case EffectNever:
