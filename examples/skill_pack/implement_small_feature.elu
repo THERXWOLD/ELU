@@ -1,0 +1,42 @@
+pack "eluuna.skill.implement_small_feature" version 1
+type = "skill_pack"
+
+skill "implement_small_feature":
+  title = "Implement Small Feature"
+  category = "engineering"
+  risk = "high"
+  autonomy = "level_2"
+  uses:
+    tools:
+      - "repo.search"
+      - "repo.read"
+      - "repo.patch"
+      - "tests.run"
+    policies:
+      - "therxwold.repo.policy"
+      - "eluuna.guardrails.core"
+      - "eluuna.filters.core"
+  allowed_targets:
+    - "docs"
+    - "frontend"
+  propose_only_targets:
+    - "backend"
+  forbidden_targets:
+    - "secrets"
+    - "deployment"
+    - "permissions"
+    - "auth"
+  steps:
+    - "understand request"
+    - "read relevant files"
+    - "prepare minimal patch"
+    - "run validation if allowed"
+    - "summarize diff and risk"
+  done_when:
+    - "patch is minimal"
+    - "protected paths are untouched"
+    - "tests pass or failures are explained"
+  never:
+    - "disable tests to make build pass"
+    - "edit secrets"
+    - "bypass policy engine"

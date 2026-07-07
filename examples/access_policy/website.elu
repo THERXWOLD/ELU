@@ -1,0 +1,37 @@
+pack "app.security.access" version 1
+type = "access_policy"
+
+access "website":
+  default = "deny"
+  role "guest":
+    allow:
+      read:
+        - "page.public"
+        - "blog.post.published"
+  role "author":
+    allow:
+      create:
+        - "blog.post"
+    rule "edit_own_draft":
+      effect = "allow"
+      action = "update"
+      resource = "blog.post"
+      when:
+        - resource.owner_id eq $subject.id
+        - resource.status eq "draft"
+    rule "published_posts_need_approval":
+      effect = "approval"
+      action = "update"
+      resource = "blog.post"
+      when:
+        - resource.owner_id eq $subject.id
+        - resource.status eq "published"
+  role "admin":
+    allow:
+      read:
+        - "*"
+      delete:
+        - "owner.account"
+  never:
+    delete:
+      - "owner.account"

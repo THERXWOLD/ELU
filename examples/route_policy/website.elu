@@ -1,0 +1,20 @@
+pack "app.security.routes" version 1
+type = "route_policy"
+
+routes "website":
+  default = "deny"
+  public:
+    - method = "GET"
+      path = "/"
+    - method = "GET"
+      path = "/blog/**"
+  protected:
+    - method = "GET"
+      path = "/dashboard"
+      require_role = "user"
+    - method = "POST"
+      path = "/admin/settings"
+      require_role = "admin"
+      require_2fa = true
+      audit = true
+      effect = "approval"

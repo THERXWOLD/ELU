@@ -1,0 +1,34 @@
+pack "eluuna.filters.core" version 1
+type = "filter_pack"
+
+filter "secret_detector":
+  applies_to:
+    - "file.read"
+    - "logs.read"
+    - "context.build"
+    - "output.send"
+    - "memory.write"
+  detect:
+    - "api_key"
+    - "private_key"
+    - "jwt"
+    - "bearer_token"
+    - "database_url"
+    - "ssh_key"
+  action:
+    on_detect = "redact"
+    replacement = "[REDACTED_SECRET]"
+  escalate:
+    when = "secret appears in output"
+    action = "block"
+
+filter "protected_paths":
+  applies_to:
+    - "repo.patch"
+  block_paths:
+    - ".env*"
+    - "**/*.pem"
+    - "**/*.key"
+    - "**/secrets/**"
+  action:
+    on_match = "deny"

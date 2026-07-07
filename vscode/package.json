@@ -1,0 +1,39 @@
+{
+  "name": "elu-vscode",
+  "displayName": "ELU Language Support",
+  "description": "Syntax highlighting for .elu policy/config files.",
+  "version": "0.1.0",
+  "publisher": "therxwold",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "elu",
+        "aliases": [
+          "ELU",
+          "elu"
+        ],
+        "extensions": [
+          ".elu"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "elu",
+        "scopeName": "source.elu",
+        "path": "./syntaxes/elu.tmLanguage.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/therxwold/elu.git"
+  }
+}

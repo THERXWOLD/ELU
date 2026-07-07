@@ -1,0 +1,55 @@
+# Deny-list
+*
+
+# Allow-list
+!.gitignore
+!*.go
+!go.mod
+!go.sum
+!README.md
+
+# Packages
+!value/
+!value/**
+!diag/
+!diag/**
+!ast/
+!ast/**
+!extension/
+!extension/**
+!internal/
+!internal/**
+!policy/
+!policy/**
+!parser/
+!parser/**
+!condition/
+!condition/**
+!filter/
+!filter/**
+!guardrail/
+!guardrail/**
+!skill/
+!skill/**
+!access/
+!access/**
+!route/
+!route/**
+!repo/
+!repo/**
+!format/
+!format/**
+!validate/
+!validate/**
+!e2e/
+!e2e/**
+!cmd/
+!cmd/**
+
+# Examples and tooling
+!examples/
+!examples/**
+!testdata/
+!testdata/**
+!vscode/
+!vscode/**

@@ -1,0 +1,20 @@
+pack "app.security.access" version 1
+type = "access_policy"
+
+access "website":
+  default = "deny"
+
+  role "admin":
+    allow:
+      read:
+        - "*"
+
+  role "author":
+    rule "edit_own_draft":
+      effect = "allow"
+      action = "update"
+      resource = "blog.post"
+
+      when:
+        - resource.owner_id eq $subject.id
+        - resource.status eq "draft"

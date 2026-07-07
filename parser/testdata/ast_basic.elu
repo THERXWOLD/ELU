@@ -1,0 +1,10 @@
+pack "test.skill.example" version 1
+type = "skill_pack"
+
+skill "example":
+  title = "Example"
+  category = "engineering"
+  risk = "low"
+  steps:
+    - "read"
+    - "write"

@@ -1,0 +1,34 @@
+pack "eluuna.guardrails.core" version 1
+type = "guardrail_pack"
+
+priority = "critical"
+
+guardrail "no_secret_exposure":
+  severity = "critical"
+  applies_to:
+    - "repo.read"
+    - "file.read"
+    - "logs.read"
+    - "context.build"
+    - "memory.write"
+    - "output.send"
+  never:
+    - "print secrets"
+    - "summarize secrets"
+    - "copy secrets into prompts"
+    - "send secrets to external models"
+    - "store secrets in memory"
+  on_violation:
+    action = "block"
+    report = "Secret exposure attempt blocked."
+
+guardrail "no_self_permission_edits":
+  severity = "critical"
+  never_edit:
+    - "policies/guardrails.elu"
+    - "policies/filters.elu"
+    - "policies/tools.elu"
+  requires_approval:
+    edit:
+      - "policies/repo.elu"
+      - "policies/skills/**"

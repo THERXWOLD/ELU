@@ -1,0 +1,8 @@
+pack "therxwold.stream.events" version 1
+type = "stream_event_policy"
+
+stream_events "main":
+  event "new_follower":
+    cooldown = "10s"
+    trigger_skill = "stream_banter"
+    voice_style = "playful"

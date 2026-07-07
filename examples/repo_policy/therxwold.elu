@@ -1,0 +1,41 @@
+pack "therxwold.repo.policy" version 1
+type = "repo_policy"
+
+repo "THERXWOLD":
+  default:
+    read = "allow"
+    edit = "deny"
+    execute = "deny"
+    context = "deny"
+  allow:
+    edit:
+      - "README.md"
+      - "docs/**/*.md"
+      - "frontend/src/**/*.tsx"
+      - "frontend/src/**/*.sass"
+  propose:
+    edit:
+      - "backend/**/*.go"
+  approval:
+    edit:
+      - "backend/internal/auth/**"
+      - "backend/internal/security/**"
+      - "backend/internal/permissions/**"
+      - ".github/workflows/**"
+      - "docker-compose*.yml"
+  deny:
+    read:
+      - ".env*"
+      - "**/*.pem"
+      - "**/*.key"
+    context:
+      - ".env*"
+      - "**/*.pem"
+      - "**/*.key"
+  never:
+    edit:
+      - ".env*"
+      - "**/*.pem"
+      - "**/*.key"
+      - "policies/guardrails.elu"
+      - "policies/filters.elu"

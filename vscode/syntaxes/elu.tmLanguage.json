@@ -1,0 +1,193 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ELU",
+  "scopeName": "source.elu",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#header"
+    },
+    {
+      "include": "#blocks"
+    },
+    {
+      "include": "#sections"
+    },
+    {
+      "include": "#assignments"
+    },
+    {
+      "include": "#conditionExpressions"
+    },
+    {
+      "include": "#listItems"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#booleans"
+    },
+    {
+      "include": "#effects"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.elu",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "header": {
+      "patterns": [
+        {
+          "name": "meta.header.pack.elu",
+          "match": "^(pack)\\s+(\\\"[^\\\"]+\\\")\\s+(version)\\s+([0-9]+)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.elu"
+            },
+            "2": {
+              "name": "string.quoted.double.elu"
+            },
+            "3": {
+              "name": "keyword.control.elu"
+            },
+            "4": {
+              "name": "constant.numeric.integer.elu"
+            }
+          }
+        }
+      ]
+    },
+    "blocks": {
+      "patterns": [
+        {
+          "name": "meta.block.elu",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s+(\\\"[^\\\"]+\\\")\\s*:",
+          "captures": {
+            "1": {
+              "name": "entity.name.type.block.elu"
+            },
+            "2": {
+              "name": "string.quoted.double.elu"
+            }
+          }
+        }
+      ]
+    },
+    "sections": {
+      "patterns": [
+        {
+          "name": "meta.section.elu",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_.-]*|\\*|\\\"[^\\\"]+\\\")\\s*:",
+          "captures": {
+            "1": {
+              "name": "entity.name.tag.section.elu"
+            }
+          }
+        }
+      ]
+    },
+    "assignments": {
+      "patterns": [
+        {
+          "name": "meta.assignment.elu",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "variable.other.key.elu"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.elu"
+            }
+          }
+        }
+      ]
+    },
+    "listItems": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.list.elu",
+          "match": "^\\s*(-)\\s+"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.elu",
+          "begin": "\\\"",
+          "end": "\\\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.elu",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.elu",
+          "match": "\\b-?[0-9]+\\.[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.elu",
+          "match": "\\b-?[0-9]+\\b"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.elu",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "effects": {
+      "patterns": [
+        {
+          "name": "storage.modifier.effect.elu",
+          "match": "\\b(allow|propose|approval|deny|never)\\b"
+        }
+      ]
+    },
+    "conditionExpressions": {
+      "patterns": [
+        {
+          "name": "meta.condition.expression.elu",
+          "match": "^(\\s*-\\s+)(not\\s+)?([A-Za-z_][A-Za-z0-9_.-]*)(\\s+)(eq|neq|in|not_in|contains|exists|missing|matches|lt|lte|gt|gte|starts_with|ends_with)(?:\\s+(\\$[A-Za-z_][A-Za-z0-9_.-]*|[^#]+))?",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.list.elu"
+            },
+            "2": {
+              "name": "keyword.operator.logical.elu"
+            },
+            "3": {
+              "name": "variable.other.condition-field.elu"
+            },
+            "5": {
+              "name": "keyword.operator.condition.elu"
+            },
+            "6": {
+              "name": "meta.condition.value.elu"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
