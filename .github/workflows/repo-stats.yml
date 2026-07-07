@@ -15,3 +15,5 @@ jobs:
           REPO_OWNER: THERXWOLD
           REPO_NAME: ELU
           COMMIT_BY_ME: True
+          SHOW_SVG_CARDS: "True"
+          SVG_THEME: "github_dark"
