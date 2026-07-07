@@ -46,10 +46,18 @@ narukoshin               2 commits           ███░░░░░░░░�
 ```text
 readme-bot: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 readme-bot: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-AIRI: fix: allow-list .ascommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-readme-bot: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-AIRI: add: enable SVG carcommit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: fix: allow-list .ascommit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
+
+![Stats chart](https://raw.githubusercontent.com/THERXWOLD/ELU/main/.assets/repo_stats.svg)
+
+![Languages chart](https://raw.githubusercontent.com/THERXWOLD/ELU/main/.assets/repo_languages.svg)
+
+![Contributors chart](https://raw.githubusercontent.com/THERXWOLD/ELU/main/.assets/repo_contributors.svg)
+
+![Commits chart](https://raw.githubusercontent.com/THERXWOLD/ELU/main/.assets/repo_commits.svg)
 
 
 <!--END_SECTION:repo_stats-->
