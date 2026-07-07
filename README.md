@@ -2,6 +2,9 @@
 
 *A tiny embeddable policy language — like JSON5 grew up and got a job in security.*
 
+<!--START_SECTION:repo_stats-->
+<!--END_SECTION:repo_stats-->
+
 <img src="https://img.shields.io/badge/go-1.22+-00ADD8?logo=go&logoColor=white"> <img src="https://img.shields.io/badge/status-experimental-orange"> <img src="https://img.shields.io/badge/license-GPLv3-blue"> <img src="https://img.shields.io/badge/PRs-welcome-brightgreen">
 
 > [!WARNING]

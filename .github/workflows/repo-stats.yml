@@ -1,0 +1,16 @@
+name: Repo Stats
+
+on:
+  schedule:
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: narukoshin/repo-readme-stats@main
+        with:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: THERXWOLD
+          REPO_NAME: ELU
