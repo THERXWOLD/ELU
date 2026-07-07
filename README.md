@@ -43,11 +43,11 @@ narukoshin               1 commits           ████████░░░�
 🕐 **Recent Commits** 
 
 ```text
-readme-bot: Updated with commit 1            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
-readme-bot: Updated with commit 2            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
-湖心なる: Add COMMIT_BY_ME pacommit 3            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
-readme-bot: Updated with commit 4            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
-readme-bot: Updated with commit 5            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
+AIRI: add: enable SVG carcommit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: add: LICENSE       commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
