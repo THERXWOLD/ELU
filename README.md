@@ -3,6 +3,52 @@
 *A tiny embeddable policy language — like JSON5 grew up and got a job in security.*
 
 <!--START_SECTION:repo_stats-->
+⭐ **Stars** 
+
+```text
+Total: 0
+```
+
+🍴 **Forks** 
+
+```text
+Total: 0
+```
+
+📋 **Issues** 
+
+```text
+Open: 0
+```
+
+🔀 **Pull Requests** 
+
+```text
+Open: 0
+```
+
+💬 **Languages** 
+
+```text
+Go                       100.0%              █████████████████████████   100.00 % 
+```
+
+👥 **Top Contributors** 
+
+```text
+eluuna461                2 commits           █████████████████░░░░░░░░   66.67 % 
+narukoshin               1 commits           ████████░░░░░░░░░░░░░░░░░   33.33 % 
+```
+
+🕐 **Recent Commits** 
+
+```text
+AIRI: add repo-stats workcommit 1            ████████░░░░░░░░░░░░░░░░░   33.33 % 
+AIRI: add doc comments tocommit 2            ████████░░░░░░░░░░░░░░░░░   33.33 % 
+Naru K: add all files    commit 3            ████████░░░░░░░░░░░░░░░░░   33.33 % 
+```
+
+
 <!--END_SECTION:repo_stats-->
 
 <img src="https://img.shields.io/badge/go-1.22+-00ADD8?logo=go&logoColor=white"> <img src="https://img.shields.io/badge/status-experimental-orange"> <img src="https://img.shields.io/badge/license-GPLv3-blue"> <img src="https://img.shields.io/badge/PRs-welcome-brightgreen">
