@@ -43,10 +43,10 @@ narukoshin               1 commits           ████████░░░�
 🕐 **Recent Commits** 
 
 ```text
-AIRI: add: enable SVG carcommit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-AIRI: add: LICENSE       commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-readme-bot: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-readme-bot: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: fix: allow-list .ascommit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: add: enable SVG carcommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: add: LICENSE       commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 readme-bot: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
