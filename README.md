@@ -43,11 +43,11 @@ narukoshin               1 commits           ████████░░░�
 🕐 **Recent Commits** 
 
 ```text
-readme-bot: Updated with commit 1            ████░░░░░░░░░░░░░░░░░░░░░   14.29 % 
-湖心なる: Add COMMIT_BY_ME pacommit 2            ████░░░░░░░░░░░░░░░░░░░░░   14.29 % 
-readme-bot: Updated with commit 3            ████░░░░░░░░░░░░░░░░░░░░░   14.29 % 
-readme-bot: Updated with commit 4            ████░░░░░░░░░░░░░░░░░░░░░   14.29 % 
-AIRI: add repo-stats workcommit 5            ████░░░░░░░░░░░░░░░░░░░░░   14.29 % 
+readme-bot: Updated with commit 1            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
+readme-bot: Updated with commit 2            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
+湖心なる: Add COMMIT_BY_ME pacommit 3            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
+readme-bot: Updated with commit 4            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
+readme-bot: Updated with commit 5            ███░░░░░░░░░░░░░░░░░░░░░░   12.50 % 
 ```
 
 
