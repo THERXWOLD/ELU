@@ -36,18 +36,19 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-eluuna461                2 commits           █████████████████░░░░░░░░   66.67 % 
-narukoshin               1 commits           ████████░░░░░░░░░░░░░░░░░   33.33 % 
+github-actions[bot]      7 commits           ████████████░░░░░░░░░░░░░   50.00 % 
+eluuna461                5 commits           █████████░░░░░░░░░░░░░░░░   35.71 % 
+narukoshin               2 commits           ████░░░░░░░░░░░░░░░░░░░░░   14.29 % 
 ```
 
 🕐 **Recent Commits** 
 
 ```text
-AIRI: fix: allow-list .ascommit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-readme-bot: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-AIRI: add: enable SVG carcommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-AIRI: add: LICENSE       commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-readme-bot: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: fix: allow-list .ascommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+readme-bot: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: add: enable SVG carcommit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: add: LICENSE       commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
