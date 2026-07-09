@@ -36,19 +36,19 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-github-actions[bot]      9 commits           ███████████░░░░░░░░░░░░░░   42.86 % 
-narukoshin               7 commits           ████████░░░░░░░░░░░░░░░░░   33.33 % 
-eluuna461                5 commits           ██████░░░░░░░░░░░░░░░░░░░   23.81 % 
+github-actions[bot]      9 commits           ██████████░░░░░░░░░░░░░░░   40.91 % 
+narukoshin               8 commits           █████████░░░░░░░░░░░░░░░░   36.36 % 
+eluuna461                5 commits           ██████░░░░░░░░░░░░░░░░░░░   22.73 % 
 ```
 
 🕐 **Recent Commits** 
 
 ```text
-湖心なる: Delete .assets direcommit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Change cron schedulcommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Remove SVG card optcommit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+narukoshin: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Delete .assets direcommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Change cron schedulcommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+narukoshin: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Remove SVG card optcommit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
