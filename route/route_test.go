@@ -76,7 +76,7 @@ func TestRoutePolicyEvaluation(t *testing.T) {
 		{"GET", "/blog/hello/world", nil, false, nil, policy.EffectAllow, false},
 		{"GET", "/dashboard", nil, false, nil, policy.EffectDeny, false},
 		{"GET", "/dashboard", []string{"user"}, false, nil, policy.EffectAllow, false},
-		{"POST", "/admin/settings", []string{"admin"}, false, nil, policy.EffectDeny, false},
+		{"POST", "/admin/settings", []string{"admin"}, false, nil, policy.EffectDeny, true},
 		{"POST", "/admin/settings", []string{"admin"}, true, nil, policy.EffectApproval, true},
 		{"POST", "/api/posts/123", []string{"author"}, false, condition.EvalContext{"resource.status": "draft"}, policy.EffectAllow, false},
 		{"POST", "/api/posts/123", []string{"author"}, false, condition.EvalContext{"resource.status": "published"}, policy.EffectDeny, false},

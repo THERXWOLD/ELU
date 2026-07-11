@@ -313,33 +313,52 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		if !glob.Match(r.Path, req.Path) {
 			continue
 		}
+		// Once method and path match, authorization failures must not fall
+		// through to a more permissive policy default.
 		if r.RequireRole != "" && !hasRole(req.Roles, r.RequireRole) {
+			matched = append(matched, r.Name)
+			audit = audit || r.Audit
+			decision = strongerEffect(decision, policy.EffectDeny)
 			continue
 		}
 		if r.Require2FA && !req.MFA {
+			matched = append(matched, r.Name)
+			audit = audit || r.Audit
+			decision = strongerEffect(decision, policy.EffectDeny)
 			continue
 		}
 		if r.Condition != nil {
-			ok, err := condition.Evaluate(*r.Condition, ctx, reg)
+			ok, err := condition.EvaluateStrict(*r.Condition, ctx, reg)
 			if err != nil {
 				return Decision{Effect: policy.EffectNever, Errors: []string{fmt.Sprintf("route %q condition error: %v", r.Name, err)}}
 			}
 			if !ok {
+				// A condition attached to an authenticated route is an additional
+				// authorization requirement, not a reason to use the default.
+				if r.RequireRole != "" {
+					matched = append(matched, r.Name)
+					audit = audit || r.Audit
+					decision = strongerEffect(decision, policy.EffectDeny)
+				}
 				continue
 			}
 		}
 		matched = append(matched, r.Name)
-		if r.Audit {
-			audit = true
-		}
-		if decision == "" || policy.Stronger(r.Effect, decision) {
-			decision = r.Effect
-		}
+		audit = audit || r.Audit
+		decision = strongerEffect(decision, r.Effect)
 	}
 	if decision == "" {
 		decision = p.Default
 	}
 	return Decision{Effect: decision, MatchedRoutes: matched, Audit: audit}
+}
+
+// strongerEffect returns candidate when it outranks current.
+func strongerEffect(current, candidate policy.Effect) policy.Effect {
+	if current == "" || policy.Stronger(candidate, current) {
+		return candidate
+	}
+	return current
 }
 
 // hasRole checks if a role is in a list of roles.
