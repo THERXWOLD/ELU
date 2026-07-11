@@ -36,18 +36,18 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-github-actions[bot]      9 commits           ██████████░░░░░░░░░░░░░░░   39.13 % 
-narukoshin               9 commits           ██████████░░░░░░░░░░░░░░░   39.13 % 
-eluuna461                5 commits           █████░░░░░░░░░░░░░░░░░░░░   21.74 % 
+narukoshin               13 commits          ████████████░░░░░░░░░░░░░   48.15 % 
+github-actions[bot]      9 commits           ████████░░░░░░░░░░░░░░░░░   33.33 % 
+eluuna461                5 commits           █████░░░░░░░░░░░░░░░░░░░░   18.52 % 
 ```
 
 🕐 **Recent Commits** 
 
 ```text
-narukoshin: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Delete .assets direcommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Change cron schedulcommit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+Naru K: bugfix: fail-closcommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+Naru K: adding ci workflocommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+narukoshin: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 narukoshin: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
