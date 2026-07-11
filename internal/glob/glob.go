@@ -45,11 +45,15 @@ func normalize(s string) string {
 func globRegexp(pattern string) *regexp.Regexp {
 	var b strings.Builder
 	b.WriteString("^")
-	for i := 0; i < len(pattern); {
-		switch pattern[i] {
+
+	// Iterate over Unicode code points, not UTF-8 bytes. Quoting one byte at a
+	// time corrupts non-ASCII literals such as "café" or "資料".
+	runes := []rune(pattern)
+	for i := 0; i < len(runes); {
+		switch runes[i] {
 		case '*':
-			if i+1 < len(pattern) && pattern[i+1] == '*' {
-				if i+2 < len(pattern) && pattern[i+2] == '/' {
+			if i+1 < len(runes) && runes[i+1] == '*' {
+				if i+2 < len(runes) && runes[i+2] == '/' {
 					b.WriteString("(?:.*/)?")
 					i += 3
 					continue
@@ -64,7 +68,7 @@ func globRegexp(pattern string) *regexp.Regexp {
 			b.WriteString("[^/]")
 			i++
 		default:
-			b.WriteString(regexp.QuoteMeta(string(pattern[i])))
+			b.WriteString(regexp.QuoteMeta(string(runes[i])))
 			i++
 		}
 	}

@@ -576,21 +576,47 @@ func validateTree(cond Condition) error {
 	return nil
 }
 
+// EvalOptions controls how runtime data problems are handled.
+// The zero value preserves ELU's historical permissive condition semantics.
+type EvalOptions struct {
+	MissingFieldIsError bool
+	TypeMismatchIsError bool
+}
+
+// strictEvalOptions are suitable for authorization and safety decisions.
+var strictEvalOptions = EvalOptions{
+	MissingFieldIsError: true,
+	TypeMismatchIsError: true,
+}
+
 // Evaluate validates and then evaluates a condition tree against a context.
-// Returns true if the condition matches, false otherwise.
+// It preserves the historical behavior where missing fields and incompatible
+// operand types simply make a condition false. Security-sensitive callers
+// should use EvaluateStrict.
 func Evaluate(cond Condition, ctx EvalContext, reg *extension.Registry) (bool, error) {
+	return EvaluateWithOptions(cond, ctx, reg, EvalOptions{})
+}
+
+// EvaluateStrict validates and evaluates using fail-closed runtime semantics.
+// Missing fields, missing references, and incompatible operand types are errors.
+func EvaluateStrict(cond Condition, ctx EvalContext, reg *extension.Registry) (bool, error) {
+	return EvaluateWithOptions(cond, ctx, reg, strictEvalOptions)
+}
+
+// EvaluateWithOptions validates and evaluates a condition using opts.
+func EvaluateWithOptions(cond Condition, ctx EvalContext, reg *extension.Registry, opts EvalOptions) (bool, error) {
 	if err := Validate(cond, reg); err != nil {
 		return false, err
 	}
-	return evalValidated(cond, ctx, reg)
+	return evalValidated(cond, ctx, reg, opts)
 }
 
 // evalValidated evaluates a condition tree that has already passed validation.
 // Skips re-validation for performance — call Validate first if unsure.
-func evalValidated(cond Condition, ctx EvalContext, reg *extension.Registry) (bool, error) {
+func evalValidated(cond Condition, ctx EvalContext, reg *extension.Registry, opts EvalOptions) (bool, error) {
 	if len(cond.All) > 0 {
 		for _, c := range cond.All {
-			ok, err := evalValidated(c, ctx, reg)
+			ok, err := evalValidated(c, ctx, reg, opts)
 			if err != nil || !ok {
 				return ok, err
 			}
@@ -599,7 +625,7 @@ func evalValidated(cond Condition, ctx EvalContext, reg *extension.Registry) (bo
 	}
 	if len(cond.Any) > 0 {
 		for _, c := range cond.Any {
-			ok, err := evalValidated(c, ctx, reg)
+			ok, err := evalValidated(c, ctx, reg, opts)
 			if err != nil {
 				return false, err
 			}
@@ -610,7 +636,7 @@ func evalValidated(cond Condition, ctx EvalContext, reg *extension.Registry) (bo
 		return false, nil
 	}
 	if cond.Not != nil {
-		ok, err := evalValidated(*cond.Not, ctx, reg)
+		ok, err := evalValidated(*cond.Not, ctx, reg, opts)
 		if err != nil {
 			return false, err
 		}
@@ -624,51 +650,74 @@ func evalValidated(cond Condition, ctx EvalContext, reg *extension.Registry) (bo
 		return !exists, nil
 	}
 	if !exists {
+		if opts.MissingFieldIsError {
+			return false, fmt.Errorf("condition field %q is missing", cond.Field)
+		}
 		return false, nil
 	}
 	var right any = cond.Value
 	if cond.Ref != "" {
 		rv, ok := lookup(ctx, cond.Ref)
 		if !ok {
+			if opts.MissingFieldIsError {
+				return false, fmt.Errorf("condition reference %q is missing", cond.Ref)
+			}
 			return false, nil
 		}
 		right = rv
 	}
-	return evalOp(cond.Op, left, right, reg)
+	return evalOp(cond.Op, left, right, reg, opts)
 }
 
 // evalOp dispatches to the right comparison function based on operator name.
-func evalOp(op string, left, right any, reg *extension.Registry) (bool, error) {
+func evalOp(op string, left, right any, reg *extension.Registry, opts EvalOptions) (bool, error) {
 	switch op {
-	case "eq":
-		return compareEqual(left, right), nil
-	case "neq":
-		return !compareEqual(left, right), nil
-	case "contains":
-		return contains(left, right), nil
-	case "in":
-		return contains(right, left), nil
-	case "not_in":
-		return !contains(right, left), nil
-	case "matches":
+	case "eq", "neq":
+		if opts.TypeMismatchIsError && !equalityCompatible(left, right) {
+			return false, typeMismatch(op, left, right)
+		}
+		equal := compareEqual(left, right)
+		if op == "neq" {
+			equal = !equal
+		}
+		return equal, nil
+	case "contains", "in", "not_in":
+		container, item := left, right
+		if op == "in" || op == "not_in" {
+			container, item = right, left
+		}
+		matched, compatible := containsChecked(container, item)
+		if opts.TypeMismatchIsError && !compatible {
+			return false, typeMismatch(op, left, right)
+		}
+		if op == "not_in" {
+			matched = !matched
+		}
+		return matched, nil
+	case "matches", "starts_with", "ends_with":
 		ls, ok1 := left.(string)
 		rs, ok2 := right.(string)
 		if !ok1 || !ok2 {
+			if opts.TypeMismatchIsError {
+				return false, typeMismatch(op, left, right)
+			}
 			return false, nil
 		}
-		return glob.Match(rs, ls), nil
-	case "starts_with":
-		ls, ok1 := left.(string)
-		rs, ok2 := right.(string)
-		return ok1 && ok2 && strings.HasPrefix(ls, rs), nil
-	case "ends_with":
-		ls, ok1 := left.(string)
-		rs, ok2 := right.(string)
-		return ok1 && ok2 && strings.HasSuffix(ls, rs), nil
+		switch op {
+		case "matches":
+			return glob.Match(rs, ls), nil
+		case "starts_with":
+			return strings.HasPrefix(ls, rs), nil
+		default:
+			return strings.HasSuffix(ls, rs), nil
+		}
 	case "lt", "lte", "gt", "gte":
 		lf, lok := number(left)
 		rf, rok := number(right)
 		if !lok || !rok {
+			if opts.TypeMismatchIsError {
+				return false, typeMismatch(op, left, right)
+			}
 			return false, nil
 		}
 		switch op {
@@ -766,58 +815,77 @@ func floatEqual(a, b float64) bool {
 	return math.Abs(a-b) < epsilon
 }
 
-// contains checks if a container contains an item.
-// Works with strings (substring), slices, arrays, and maps.
-func contains(container, item any) bool {
+// equalityCompatible reports whether eq/neq operands have compatible runtime types.
+// Numeric Go types are intentionally cross-compatible.
+func equalityCompatible(a, b any) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	_, an := number(a)
+	_, bn := number(b)
+	if an || bn {
+		return an && bn
+	}
+	return reflect.TypeOf(a) == reflect.TypeOf(b)
+}
+
+func typeMismatch(op string, left, right any) error {
+	return fmt.Errorf("operator %q received incompatible operands %T and %T", op, left, right)
+}
+
+// containsChecked checks membership and reports whether the operand types are
+// meaningful for the operation.
+func containsChecked(container, item any) (bool, bool) {
 	switch c := container.(type) {
 	case string:
 		s, ok := item.(string)
-		return ok && strings.Contains(c, s)
+		return ok && strings.Contains(c, s), ok
 	case []string:
 		s, ok := item.(string)
 		if !ok {
-			return false
+			return false, false
 		}
 		for _, x := range c {
 			if x == s {
-				return true
+				return true, true
 			}
 		}
-		return false
+		return false, true
 	case []any:
 		for _, x := range c {
 			if compareEqual(x, item) {
-				return true
+				return true, true
 			}
 		}
-		return false
+		return false, true
 	case map[string]any:
 		s, ok := item.(string)
 		if !ok {
-			return false
+			return false, false
 		}
 		_, exists := c[s]
-		return exists
+		return exists, true
 	default:
 		rv := reflect.ValueOf(container)
 		if !rv.IsValid() {
-			return false
+			return false, false
 		}
 		if rv.Kind() == reflect.Map && rv.Type().Key().Kind() == reflect.String {
 			s, ok := item.(string)
 			if !ok {
-				return false
+				return false, false
 			}
-			return rv.MapIndex(reflect.ValueOf(s)).IsValid()
+			return rv.MapIndex(reflect.ValueOf(s)).IsValid(), true
 		}
 		if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
 			for i := 0; i < rv.Len(); i++ {
 				if compareEqual(rv.Index(i).Interface(), item) {
-					return true
+					return true, true
 				}
 			}
+			return false, true
 		}
-		return false
+		return false, false
 	}
 }
 

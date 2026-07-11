@@ -399,7 +399,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 			continue
 		}
 		if r.Condition != nil {
-			ok, err := condition.Evaluate(*r.Condition, ctx, reg)
+			ok, err := condition.EvaluateStrict(*r.Condition, ctx, reg)
 			if err != nil {
 				return Decision{Effect: policy.EffectNever, Errors: []string{fmt.Sprintf("rule %q condition error: %v", r.Name, err)}}
 			}
