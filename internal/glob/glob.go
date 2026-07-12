@@ -36,7 +36,10 @@ func Match(pattern, value string) bool {
 }
 
 // normalize swaps backslashes for forward slashes so Windows paths
-// don't break everything, then cleans path traversal segments.
+// don't break everything, then cleans redundant ./ and ../ segments.
+// path.Clean is safe here because normalize is called on individual
+// path segments (or whole glob values), not filesystem paths — the
+// caller is responsible for I/O boundaries.
 func normalize(s string) string {
 	s = strings.ReplaceAll(s, "\\", "/")
 	s = path.Clean(s)
