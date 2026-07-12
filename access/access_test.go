@@ -539,3 +539,55 @@ func TestAccessDoesNotOverrideNestedResourceType(t *testing.T) {
 		t.Fatalf("expected allow, got %s errors=%v", d.Effect, d.Errors)
 	}
 }
+
+func TestEvaluateAggregatesMultipleConditionErrors(t *testing.T) {
+	src := `pack "app.security.access" version 1
+type = "access_policy"
+
+access "site":
+  default = "deny"
+
+  role "admin":
+    rule "bad_one":
+      effect = "allow"
+      action = "read"
+      resource = "*"
+
+      when:
+        all:
+          - field = "subject.id"
+            op = "missing_op_a"
+            value = "x"
+
+    rule "bad_two":
+      effect = "allow"
+      action = "read"
+      resource = "*"
+
+      when:
+        all:
+          - field = "subject.id"
+            op = "missing_op_b"
+            value = "y"
+
+    rule "good_rule":
+      effect = "allow"
+      action = "read"
+      resource = "*"
+`
+	f, err := parser.ParseString("multierr.elu", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := access.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := p.Evaluate(access.Request{Roles: []string{"admin"}, Action: "read", Resource: "secret"}, extension.NewRegistry())
+	if d.Effect != policy.EffectNever {
+		t.Fatalf("expected fail-closed never, got %s matched=%v", d.Effect, d.MatchedRules)
+	}
+	if len(d.Errors) < 2 {
+		t.Fatalf("expected at least 2 aggregated errors, got %d: %v", len(d.Errors), d.Errors)
+	}
+}
