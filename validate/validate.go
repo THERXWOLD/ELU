@@ -25,6 +25,9 @@ func ProductionFile(f *ast.File, reg *extension.Registry) diag.Diagnostics {
 // and custom types must have registered validators. In non-strict mode, unknown
 // types get warnings instead.
 func File(f *ast.File, reg *extension.Registry, strict bool) diag.Diagnostics {
+	if f == nil {
+		return diag.Diagnostics{{Severity: diag.Error, File: "", Message: "nil ast.File"}}
+	}
 	if reg == nil {
 		reg = extension.NewRegistry()
 	}
