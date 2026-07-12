@@ -591,3 +591,30 @@ access "site":
 		t.Fatalf("expected at least 2 aggregated errors, got %d: %v", len(d.Errors), d.Errors)
 	}
 }
+
+func TestDecodeIgnoresTopLevelAssignments(t *testing.T) {
+	src := `pack "app.security.access" version 1
+type = "access_policy"
+
+metadata = "ignored"
+
+access "site":
+  default = "deny"
+
+  role "admin":
+    allow:
+      read:
+        - "*"
+`
+	f, err := parser.ParseString("assign.elu", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := access.Decode(f)
+	if err != nil {
+		t.Fatalf("expected decode to succeed with top-level assignment, got: %v", err)
+	}
+	if p.Default != policy.EffectDeny {
+		t.Fatalf("expected default deny, got %s", p.Default)
+	}
+}
