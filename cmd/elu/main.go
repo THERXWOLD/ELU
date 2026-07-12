@@ -147,8 +147,12 @@ func expandDoubleStar(pattern string) ([]string, error) {
 	if root == "" {
 		root = "."
 	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
 	var out []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -161,6 +165,18 @@ func expandDoubleStar(pattern string) ([]string, error) {
 			return nil
 		}
 		if eluglob.Match(cleaned, path) {
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(absRoot, abs)
+			if err != nil {
+				return err
+			}
+			// Reject matches that escape the resolved root directory.
+			if strings.HasPrefix(rel, "..") {
+				return nil
+			}
 			out = append(out, path)
 		}
 		return nil
@@ -249,18 +265,44 @@ func (s *stringList) Set(v string) error {
 	return nil
 }
 
+// splitExplainArgs separates the file argument from flags.
+// The file may appear anywhere in args. Bool flags are known so
+// their values aren't mistaken for positionals.
+func splitExplainArgs(args []string) (file string, flags []string) {
+	knownBool := map[string]bool{"mfa": true, "json": true}
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			if file != "" {
+				return "", nil
+			}
+			file = a
+			continue
+		}
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if knownBool[name] {
+			continue
+		}
+		if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			flags = append(flags, args[i+1])
+			i++
+		}
+	}
+	return file, flags
+}
+
 // explain explains the evaluation of a policy file.
 // It supports access_policy, repo_policy, and route_policy types. It takes various flags to specify the request context for evaluation.
 // The result is printed in JSON format by default, but can be printed in a human-readable format if the --json flag is not set.
 func explain(args []string) {
-	// Allow both `elu explain file.elu --action read ...` and
-	// `elu explain --action read ... file.elu`. The standard flag package stops
-	// at the first positional argument, so move a leading file argument to the end.
-	if len(args) > 1 && !strings.HasPrefix(args[0], "-") {
-		first := args[0]
-		args = append(args[1:], first)
+	fileArg, flagArgs := splitExplainArgs(args)
+	if fileArg == "" {
+		fmt.Fprintln(os.Stderr, "elu explain: expected one .elu policy file")
+		os.Exit(2)
 	}
-	fs := flag.NewFlagSet("explain", flag.ExitOnError)
+
+	fs := flag.NewFlagSet("explain", flag.ContinueOnError)
 	var roles stringList
 	fs.Var(&roles, "role", "role to include; may be repeated")
 	subject := fs.String("subject", "", "subject id")
@@ -272,9 +314,8 @@ func explain(args []string) {
 	var ctxList stringList
 	fs.Var(&ctxList, "ctx", "context key=value; may be repeated")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	_ = fs.Parse(args)
-	if fs.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "elu explain: expected one .elu policy file")
+	if err := fs.Parse(flagArgs); err != nil {
+		fmt.Fprintln(os.Stderr, "explain:", err)
 		os.Exit(2)
 	}
 	ctx, err := parseContext(ctxList)
@@ -282,7 +323,7 @@ func explain(args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	f, err := parser.ParseFile(fs.Arg(0))
+	f, err := parser.ParseFile(fileArg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
