@@ -499,25 +499,32 @@ func segmentCanMatch(a, b string) bool {
 	return segmentPatternsOverlap(a, b)
 }
 
-// segmentPatternsOverlap checks if two glob patterns could match the same string.
-// Both contain metacharacters; we check if either can match the other pattern,
-// or if they share a common concrete prefix/suffix constraint.
+// splitLiteralBounds returns the literal string before the first metachar
+// and after the last metachar in a glob pattern.
+func splitLiteralBounds(s string) (string, string) {
+	i := strings.IndexAny(s, "*?")
+	if i < 0 {
+		return s, s
+	}
+	j := strings.LastIndexAny(s, "*?")
+	return s[:i], s[j+1:]
+}
+
+// segmentPatternsOverlap checks if two glob patterns could match the same
+// string by comparing their literal prefix and suffix portions.
 func segmentPatternsOverlap(a, b string) bool {
 	if glob.Match(a, b) || glob.Match(b, a) {
 		return true
 	}
-	return hasOverlapConstraint(a) == hasOverlapConstraint(b)
-}
-
-// hasOverlapConstraint reports whether a pattern has literal characters
-// beyond just metacharacters (e.g., "file*" has "file", but "*" and "?*" don't).
-func hasOverlapConstraint(s string) bool {
-	for _, r := range s {
-		if r != '*' && r != '?' {
-			return true
-		}
+	preA, sufA := splitLiteralBounds(a)
+	preB, sufB := splitLiteralBounds(b)
+	if !strings.HasPrefix(preA, preB) && !strings.HasPrefix(preB, preA) {
+		return false
 	}
-	return false
+	if !strings.HasSuffix(sufA, sufB) && !strings.HasSuffix(sufB, sufA) {
+		return false
+	}
+	return true
 }
 
 // hasRouteMetachar checks if a string contains glob metacharacters.
