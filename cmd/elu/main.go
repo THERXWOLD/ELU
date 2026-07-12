@@ -173,6 +173,7 @@ func expandDoubleStar(pattern string) ([]string, error) {
 			if err != nil {
 				return err
 			}
+			// Reject matches that escape the resolved root directory.
 			if strings.HasPrefix(rel, "..") {
 				return nil
 			}
@@ -301,7 +302,7 @@ func explain(args []string) {
 		os.Exit(2)
 	}
 
-	fs := flag.NewFlagSet("explain", flag.ExitOnError)
+	fs := flag.NewFlagSet("explain", flag.ContinueOnError)
 	var roles stringList
 	fs.Var(&roles, "role", "role to include; may be repeated")
 	subject := fs.String("subject", "", "subject id")
@@ -313,7 +314,10 @@ func explain(args []string) {
 	var ctxList stringList
 	fs.Var(&ctxList, "ctx", "context key=value; may be repeated")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	_ = fs.Parse(flagArgs)
+	if err := fs.Parse(flagArgs); err != nil {
+		fmt.Fprintln(os.Stderr, "explain:", err)
+		os.Exit(2)
+	}
 	ctx, err := parseContext(ctxList)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
