@@ -147,8 +147,12 @@ func expandDoubleStar(pattern string) ([]string, error) {
 	if root == "" {
 		root = "."
 	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
 	var out []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -161,6 +165,17 @@ func expandDoubleStar(pattern string) ([]string, error) {
 			return nil
 		}
 		if eluglob.Match(cleaned, path) {
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(absRoot, abs)
+			if err != nil {
+				return err
+			}
+			if strings.HasPrefix(rel, "..") {
+				return nil
+			}
 			out = append(out, path)
 		}
 		return nil
