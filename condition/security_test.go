@@ -7,29 +7,33 @@ import (
 	"github.com/therxwold/elu/extension"
 )
 
-func TestEvaluateStrictRejectsMissingField(t *testing.T) {
+func TestEvaluateRejectsMissingField(t *testing.T) {
 	cond := condition.Condition{Field: "resource.classification", Op: "eq", Value: "secret"}
 
-	ok, err := condition.Evaluate(cond, nil, extension.NewRegistry())
-	if err != nil || ok {
-		t.Fatalf("legacy evaluation should return false without error; ok=%v err=%v", ok, err)
-	}
-
-	if _, err := condition.EvaluateStrict(cond, nil, extension.NewRegistry()); err == nil {
-		t.Fatal("strict evaluation must reject a missing field")
+	if _, err := condition.Evaluate(cond, nil, extension.NewRegistry()); err == nil {
+		t.Fatal("Evaluate must reject a missing field")
 	}
 }
 
-func TestEvaluateStrictRejectsMissingReference(t *testing.T) {
+func TestEvaluatePermissiveIgnoresMissingField(t *testing.T) {
+	cond := condition.Condition{Field: "resource.classification", Op: "eq", Value: "secret"}
+
+	ok, err := condition.EvaluatePermissive(cond, nil, extension.NewRegistry())
+	if err != nil || ok {
+		t.Fatalf("permissive evaluation should return false without error; ok=%v err=%v", ok, err)
+	}
+}
+
+func TestEvaluateRejectsMissingReference(t *testing.T) {
 	cond := condition.Condition{Field: "resource.owner_id", Op: "eq", Ref: "subject.id"}
 	ctx := condition.EvalContext{"resource.owner_id": "u1"}
 
-	if _, err := condition.EvaluateStrict(cond, ctx, extension.NewRegistry()); err == nil {
-		t.Fatal("strict evaluation must reject a missing reference")
+	if _, err := condition.Evaluate(cond, ctx, extension.NewRegistry()); err == nil {
+		t.Fatal("Evaluate must reject a missing reference")
 	}
 }
 
-func TestEvaluateStrictRejectsTypeMismatch(t *testing.T) {
+func TestEvaluateRejectsTypeMismatch(t *testing.T) {
 	tests := []condition.Condition{
 		{Field: "resource.status", Op: "starts_with", Value: "draft"},
 		{Field: "resource.count", Op: "gt", Value: int64(2)},
@@ -44,21 +48,21 @@ func TestEvaluateStrictRejectsTypeMismatch(t *testing.T) {
 	}
 
 	for i, cond := range tests {
-		if _, err := condition.EvaluateStrict(cond, contexts[i], extension.NewRegistry()); err == nil {
+		if _, err := condition.Evaluate(cond, contexts[i], extension.NewRegistry()); err == nil {
 			t.Fatalf("case %d: expected type mismatch error", i)
 		}
 	}
 }
 
-func TestEvaluateStrictKeepsExistsAndMissingSemantics(t *testing.T) {
+func TestEvaluateKeepsExistsAndMissingSemantics(t *testing.T) {
 	ctx := condition.EvalContext{"subject.id": "u1"}
 
-	ok, err := condition.EvaluateStrict(condition.Condition{Field: "subject.id", Op: "exists"}, ctx, nil)
+	ok, err := condition.Evaluate(condition.Condition{Field: "subject.id", Op: "exists"}, ctx, nil)
 	if err != nil || !ok {
 		t.Fatalf("exists failed: ok=%v err=%v", ok, err)
 	}
 
-	ok, err = condition.EvaluateStrict(condition.Condition{Field: "subject.email", Op: "missing"}, ctx, nil)
+	ok, err = condition.Evaluate(condition.Condition{Field: "subject.email", Op: "missing"}, ctx, nil)
 	if err != nil || !ok {
 		t.Fatalf("missing failed: ok=%v err=%v", ok, err)
 	}

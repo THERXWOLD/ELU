@@ -86,6 +86,9 @@ func NewRegistry() *Registry {
 // RegisterPackType adds a custom pack type to the registry so it passes
 // validation even without a registered validator.
 func (r *Registry) RegisterPackType(name string) error {
+	if r == nil {
+		return fmt.Errorf("RegisterPackType called on nil Registry")
+	}
 	if name == "" {
 		return fmt.Errorf("invalid pack type: name=%q", name)
 	}
@@ -97,6 +100,9 @@ func (r *Registry) RegisterPackType(name string) error {
 
 // HasPackType reports whether a pack type is known to the registry.
 func (r *Registry) HasPackType(name string) bool {
+	if r == nil {
+		return false
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.packTypes[name]
@@ -105,6 +111,9 @@ func (r *Registry) HasPackType(name string) bool {
 // RegisterOperator adds a custom condition operator.
 // Name must be non-empty and fn must not be nil, otherwise it's a no-op.
 func (r *Registry) RegisterOperator(name string, fn OperatorFunc) error {
+	if r == nil {
+		return fmt.Errorf("RegisterOperator called on nil Registry")
+	}
 	if name == "" || fn == nil {
 		return fmt.Errorf("invalid operator: name=%q, fn=%v", name, fn)
 	}
@@ -116,6 +125,9 @@ func (r *Registry) RegisterOperator(name string, fn OperatorFunc) error {
 
 // Operator looks up a registered operator by name.
 func (r *Registry) Operator(name string) (OperatorFunc, bool) {
+	if r == nil {
+		return nil, false
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	fn, ok := r.operators[name]
@@ -125,6 +137,9 @@ func (r *Registry) Operator(name string) (OperatorFunc, bool) {
 // RegisterValidator registers a custom validator for a pack type.
 // Also registers the pack type itself so it passes HasPackType checks.
 func (r *Registry) RegisterValidator(packType string, fn ValidatorFunc) error {
+	if r == nil {
+		return fmt.Errorf("RegisterValidator called on nil Registry")
+	}
 	if packType == "" || fn == nil {
 		return fmt.Errorf("invalid validator: packType=%q, fn=%v", packType, fn)
 	}
@@ -137,6 +152,9 @@ func (r *Registry) RegisterValidator(packType string, fn ValidatorFunc) error {
 
 // Validator looks up a registered validator by pack type.
 func (r *Registry) Validator(packType string) (ValidatorFunc, bool) {
+	if r == nil {
+		return nil, false
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	fn, ok := r.validators[packType]

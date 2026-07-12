@@ -589,18 +589,23 @@ var strictEvalOptions = EvalOptions{
 	TypeMismatchIsError: true,
 }
 
-// Evaluate validates and then evaluates a condition tree against a context.
-// It preserves the historical behavior where missing fields and incompatible
-// operand types simply make a condition false. Security-sensitive callers
-// should use EvaluateStrict.
-func Evaluate(cond Condition, ctx EvalContext, reg *extension.Registry) (bool, error) {
-	return EvaluateWithOptions(cond, ctx, reg, EvalOptions{})
+// Evaluate validates and evaluates using fail-closed runtime semantics.
+// Missing fields, missing references, and incompatible operand types are errors.
+// This is the recommended entry point for authorization decisions.
+func Evaluate(cond Condition, ctx EvalContext, req *extension.Registry) (bool, error) {
+	return EvaluateWithOptions(cond, ctx, req, strictEvalOptions)
 }
 
-// EvaluateStrict validates and evaluates using fail-closed runtime semantics.
-// Missing fields, missing references, and incompatible operand types are errors.
-func EvaluateStrict(cond Condition, ctx EvalContext, reg *extension.Registry) (bool, error) {
-	return EvaluateWithOptions(cond, ctx, reg, strictEvalOptions)
+// EvaluatePermissive validates and evaluates a condition tree against a context.
+// Missing fields and incompatible operand types make the condition false
+// rather than producing errors. Use Evaluate instead for authorization.
+func EvaluatePermissive(cond Condition, ctx EvalContext, req *extension.Registry) (bool, error) {
+	return EvaluateWithOptions(cond, ctx, req, EvalOptions{})
+}
+
+// EvaluateStrict is an alias for Evaluate for backward compatibility.
+func EvaluateStrict(cond Condition, ctx EvalContext, req *extension.Registry) (bool, error) {
+	return Evaluate(cond, ctx, req)
 }
 
 // EvaluateWithOptions validates and evaluates a condition using opts.

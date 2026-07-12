@@ -48,6 +48,9 @@ type Decision struct {
 
 // Decode parses an AST into a validated repo_policy.
 func Decode(f *ast.File) (*Policy, error) {
+	if f == nil {
+		return nil, fmt.Errorf("Decode requires non-nil ast.File")
+	}
 	if f.Type != "repo_policy" {
 		return nil, fmt.Errorf("expected repo_policy, got %q", f.Type)
 	}
@@ -232,6 +235,9 @@ func decodeExplicitRule(n *ast.Node) (Rule, error) {
 
 // ValidatePolicy checks that a repo policy has valid defaults, rules, and operators.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
+	if p == nil {
+		return fmt.Errorf("ValidatePolicy requires non-nil Policy")
+	}
 	for action, effect := range p.Default {
 		if action == "" {
 			return fmt.Errorf("default action must not be empty")
@@ -261,6 +267,9 @@ func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 
 // Evaluate runs a request through the repo policy and returns a decision.
 func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
+	if p == nil {
+		return Decision{Effect: policy.EffectDeny, Errors: []string{"Evaluate requires non-nil Policy"}}
+	}
 	decision := policy.Effect("")
 	matched := []string{}
 	ctx := condition.EvalContext{}

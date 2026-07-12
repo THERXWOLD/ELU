@@ -56,6 +56,9 @@ type Decision struct {
 
 // Decode parses an AST into a validated route_policy.
 func Decode(f *ast.File) (*Policy, error) {
+	if f == nil {
+		return nil, fmt.Errorf("Decode requires non-nil ast.File")
+	}
 	if f.Type != "route_policy" {
 		return nil, fmt.Errorf("expected route_policy, got %q", f.Type)
 	}
@@ -261,6 +264,9 @@ func decodeRouteFields(children []*ast.Node, name string, defaultEffect policy.E
 
 // ValidatePolicy checks that a route_policy has valid routes and operator references.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
+	if p == nil {
+		return fmt.Errorf("ValidatePolicy requires non-nil Policy")
+	}
 	if !policy.IsEffect(string(p.Default)) {
 		return fmt.Errorf("invalid default effect %q", p.Default)
 	}
@@ -294,6 +300,9 @@ func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 
 // Evaluate runs a request through the route policy and returns a decision.
 func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
+	if p == nil {
+		return Decision{Effect: policy.EffectDeny, Errors: []string{"Evaluate requires non-nil Policy"}}
+	}
 	decision := policy.Effect("")
 	matched := []string{}
 	audit := false
