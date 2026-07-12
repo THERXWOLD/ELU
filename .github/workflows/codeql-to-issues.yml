@@ -1,0 +1,128 @@
+name: CodeQL → Issues
+
+on:
+  workflow_run:
+    workflows: ['CodeQL']
+    types: [completed]
+    branches: [main]
+
+permissions:
+  issues: write
+  security-events: read
+  actions: read
+
+jobs:
+  create-issues:
+    name: Create issues for new alerts
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const alerts = await fetchOpenAlerts();
+            if (alerts.length === 0) {
+              core.info('No open code scanning alerts.');
+              return;
+            }
+
+            const existingTitles = await fetchExistingIssueTitles();
+
+            let created = 0;
+            for (const alert of alerts) {
+              const rule = alert.rule;
+              const inst = alert.most_recent_instance;
+              const loc = inst.location;
+
+              const emoji = {
+                critical: '\u{1F534}',
+                high:     '\u{1F7E0}',
+                medium:   '\u{1F7E1}',
+                low:      '\u{1F535}',
+                warning:  '\u{1F7E1}',
+                note:     '\u{26AA}',
+              }[rule.severity] ?? '\u{26AA}';
+
+              const lineRef = loc.end_line && loc.end_line !== loc.start_line
+                ? `${loc.start_line}-${loc.end_line}`
+                : `${loc.start_line}`;
+
+              const title = `[CodeQL] ${emoji} ${rule.description} — ${loc.path}:${lineRef}`;
+
+              if (existingTitles.has(title)) {
+                core.info(`Issue already exists: ${title}`);
+                continue;
+              }
+
+              const body = [
+                `## Code Scanning Alert`,
+                '',
+                '| Field | Value |',
+                '|-------|-------|',
+                `| **Rule** | \`${rule.id}\` |`,
+                `| **Severity** | \`${rule.severity}\` |`,
+                `| **File** | \`${loc.path}\` (line ${lineRef}) |`,
+                `| **Status** | \`${alert.state}\` |`,
+                `| **Alert** | [#${alert.number}](${alert.html_url}) |`,
+                '',
+                '### Description',
+                rule.full_description || rule.description || '',
+                '',
+                '### Location',
+                '```',
+                `${loc.path}:${lineRef}`,
+                '```',
+                '',
+                '> This issue was automatically generated from a CodeQL code scanning alert.',
+                `> View the [original alert](${alert.html_url}) for more details.`,
+              ].join('\n');
+
+              const labels = ['codeql', 'security'];
+              if (['critical', 'high'].includes(rule.severity)) {
+                labels.push('priority: high');
+              }
+
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+
+              existingTitles.add(title);
+              created++;
+              core.notice(`Created issue #${issue.number}: ${issue.html_url}`);
+            }
+
+            core.info(`Done. Created ${created} new issue(s) from ${alerts.length} open alert(s).`);
+
+            async function fetchOpenAlerts() {
+              try {
+                const resp = await github.rest.codeScanning.listAlertsForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  ref: 'refs/heads/main',
+                  per_page: 100,
+                });
+                return resp.data;
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info('Code scanning not enabled or no alerts found.');
+                  return [];
+                }
+                throw error;
+              }
+            }
+
+            async function fetchExistingIssueTitles() {
+              const existing = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'codeql',
+                per_page: 100,
+              });
+              return new Set(existing.data.map(i => i.title));
+            }
