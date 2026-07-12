@@ -3,6 +3,7 @@
 package glob
 
 import (
+	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -35,9 +36,11 @@ func Match(pattern, value string) bool {
 }
 
 // normalize swaps backslashes for forward slashes so Windows paths
-// don't break everything.
+// don't break everything, then cleans path traversal segments.
 func normalize(s string) string {
-	return strings.ReplaceAll(s, "\\", "/")
+	s = strings.ReplaceAll(s, "\\", "/")
+	s = path.Clean(s)
+	return s
 }
 
 var cachedRegex = sync.Map{}
