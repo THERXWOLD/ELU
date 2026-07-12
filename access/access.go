@@ -69,6 +69,9 @@ func Decode(f *ast.File) (*Policy, error) {
 			block = n
 			continue
 		}
+		if n.Kind == ast.NodeAssign {
+			continue
+		}
 		return nil, fmt.Errorf("unexpected top-level %s %q at line %d in access_policy", n.Kind, n.Key, n.Line)
 	}
 	if block == nil {
