@@ -2,7 +2,10 @@
 // and validators. Register stuff here so the core doesn't need to know about it.
 package extension
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // OperatorFunc evaluates a condition operator at runtime.
 // Takes left and right operands, returns whether the condition holds.
@@ -75,13 +78,14 @@ func NewRegistry() *Registry {
 
 // RegisterPackType adds a custom pack type to the registry so it passes
 // validation even without a registered validator.
-func (r *Registry) RegisterPackType(name string) {
+func (r *Registry) RegisterPackType(name string) error {
 	if name == "" {
-		return
+		return fmt.Errorf("invalid pack type: name=%q", name)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.packTypes[name] = true
+	return nil
 }
 
 // HasPackType reports whether a pack type is known to the registry.
@@ -93,13 +97,14 @@ func (r *Registry) HasPackType(name string) bool {
 
 // RegisterOperator adds a custom condition operator.
 // Name must be non-empty and fn must not be nil, otherwise it's a no-op.
-func (r *Registry) RegisterOperator(name string, fn OperatorFunc) {
+func (r *Registry) RegisterOperator(name string, fn OperatorFunc) error {
 	if name == "" || fn == nil {
-		return
+		return fmt.Errorf("invalid operator: name=%q, fn=%v", name, fn)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.operators[name] = fn
+	return nil
 }
 
 // Operator looks up a registered operator by name.
@@ -112,14 +117,15 @@ func (r *Registry) Operator(name string) (OperatorFunc, bool) {
 
 // RegisterValidator registers a custom validator for a pack type.
 // Also registers the pack type itself so it passes HasPackType checks.
-func (r *Registry) RegisterValidator(packType string, fn ValidatorFunc) {
+func (r *Registry) RegisterValidator(packType string, fn ValidatorFunc) error {
 	if packType == "" || fn == nil {
-		return
+		return fmt.Errorf("invalid validator: packType=%q, fn=%v", packType, fn)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.packTypes[packType] = true
 	r.validators[packType] = fn
+	return nil
 }
 
 // Validator looks up a registered validator by pack type.

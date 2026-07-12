@@ -36,7 +36,10 @@ stream_events "main":
 	}
 
 	reg := extension.NewRegistry()
-	reg.RegisterValidator("stream_event_policy", func(pack any) error { return nil })
+	err = reg.RegisterValidator("stream_event_policy", func(pack any) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
 	diags = validate.File(f, reg, true)
 	if diags.HasErrors() {
 		t.Fatalf("registered custom pack with validator should pass strict mode: %v", diags)
@@ -126,9 +129,12 @@ stream_events "main":
 		t.Fatal(err)
 	}
 	reg := extension.NewRegistry()
-	reg.RegisterValidator("stream_event_policy", func(pack any) error {
+	err = reg.RegisterValidator("stream_event_policy", func(pack any) error {
 		return fmt.Errorf("custom validation failed")
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	diags := validate.File(f, reg, true)
 	if !diags.HasErrors() {
 		t.Fatalf("expected custom validator error")
@@ -148,11 +154,17 @@ stream_events "main":
 		t.Fatal(err)
 	}
 	reg := extension.NewRegistry()
-	reg.RegisterPackType("stream_event_policy")
+	err = reg.RegisterPackType("stream_event_policy")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if diags := validate.File(f, reg, true); !diags.HasErrors() {
 		t.Fatal("expected strict mode to reject registered custom pack without validator")
 	}
-	reg.RegisterValidator("stream_event_policy", func(pack any) error { return nil })
+	err = reg.RegisterValidator("stream_event_policy", func(pack any) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
 	if diags := validate.File(f, reg, true); diags.HasErrors() {
 		t.Fatalf("expected strict mode to accept custom pack with validator, got %v", diags)
 	}
@@ -171,7 +183,10 @@ stream_events "main":
 		t.Fatal(err)
 	}
 	reg := extension.NewRegistry()
-	reg.RegisterValidator("stream_event_policy", nil)
+	err = reg.RegisterValidator("stream_event_policy", nil)
+	if err == nil {
+		t.Fatal("expected error for nil validator registration")
+	}
 	if diags := validate.File(f, reg, true); !diags.HasErrors() {
 		t.Fatal("expected strict mode to reject custom pack registered with nil validator")
 	}
@@ -190,9 +205,12 @@ stream_events "main":
 		t.Fatal(err)
 	}
 	reg := extension.NewRegistry()
-	reg.RegisterValidator("stream_event_policy", func(pack any) error {
+	err = reg.RegisterValidator("stream_event_policy", func(pack any) error {
 		panic("boom")
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	diags := validate.File(f, reg, true)
 	if !diags.HasErrors() {
 		t.Fatal("expected validator panic to become diagnostic")
@@ -201,8 +219,11 @@ stream_events "main":
 
 func TestRegisterEmptyPackTypeIgnored(t *testing.T) {
 	reg := extension.NewRegistry()
-	reg.RegisterPackType("")
+	err := reg.RegisterPackType("")
+	if err == nil {
+		t.Fatal("expected error for empty pack type registration")
+	}
 	if reg.HasPackType("") {
-		t.Fatal("empty pack type should be ignored")
+		t.Fatal("empty pack type should not be in registry")
 	}
 }
