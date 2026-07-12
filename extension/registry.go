@@ -57,7 +57,6 @@ type noCopy struct{}
 func (*noCopy) Lock()   {}
 func (*noCopy) Unlock() {}
 
-
 // Registry is a thread-safe container for operators, pack types, and validators.
 // Use NewRegistry to get one with the built-in types preloaded.
 type Registry struct {

@@ -247,11 +247,11 @@ func decodeEffectSection(role string, effect policy.Effect, sec *ast.Node) ([]Ru
 				return nil, fmt.Errorf("empty resource in action %q at line %d", action, item.Line)
 			}
 			rules = append(rules, Rule{
-				Role: role, 
-				Effect: effect, 
-				Action: action, 
+				Role:     role,
+				Effect:   effect,
+				Action:   action,
 				Resource: res,
-				Name: fmt.Sprintf("%s:%s.%s.%s", role, string(effect), action, res),
+				Name:     fmt.Sprintf("%s:%s.%s.%s", role, string(effect), action, res),
 			})
 		}
 	}
