@@ -57,7 +57,10 @@ func ParseString(path, src string) (*ast.File, error) {
 	if m == nil {
 		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: `expected pack header: pack "id" version N`}}
 	}
-	version, _ := strconv.Atoi(m[2])
+	version, err := strconv.Atoi(m[2])
+	if err != nil {
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: fmt.Sprintf("invalid version number: %v", err)}}
+	}
 	f := &ast.File{Path: path, PackID: m[1], Version: version}
 
 	if len(lines) < 2 {
