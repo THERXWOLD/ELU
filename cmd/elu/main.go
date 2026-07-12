@@ -249,17 +249,43 @@ func (s *stringList) Set(v string) error {
 	return nil
 }
 
+// splitExplainArgs separates the file argument from flags.
+// The file may appear anywhere in args. Bool flags are known so
+// their values aren't mistaken for positionals.
+func splitExplainArgs(args []string) (file string, flags []string) {
+	knownBool := map[string]bool{"mfa": true, "json": true}
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			if file != "" {
+				return "", nil
+			}
+			file = a
+			continue
+		}
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if knownBool[name] {
+			continue
+		}
+		if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			flags = append(flags, args[i+1])
+			i++
+		}
+	}
+	return file, flags
+}
+
 // explain explains the evaluation of a policy file.
 // It supports access_policy, repo_policy, and route_policy types. It takes various flags to specify the request context for evaluation.
 // The result is printed in JSON format by default, but can be printed in a human-readable format if the --json flag is not set.
 func explain(args []string) {
-	// Allow both `elu explain file.elu --action read ...` and
-	// `elu explain --action read ... file.elu`. The standard flag package stops
-	// at the first positional argument, so move a leading file argument to the end.
-	if len(args) > 1 && !strings.HasPrefix(args[0], "-") {
-		first := args[0]
-		args = append(args[1:], first)
+	fileArg, flagArgs := splitExplainArgs(args)
+	if fileArg == "" {
+		fmt.Fprintln(os.Stderr, "elu explain: expected one .elu policy file")
+		os.Exit(2)
 	}
+
 	fs := flag.NewFlagSet("explain", flag.ExitOnError)
 	var roles stringList
 	fs.Var(&roles, "role", "role to include; may be repeated")
@@ -272,17 +298,13 @@ func explain(args []string) {
 	var ctxList stringList
 	fs.Var(&ctxList, "ctx", "context key=value; may be repeated")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	_ = fs.Parse(args)
-	if fs.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "elu explain: expected one .elu policy file")
-		os.Exit(2)
-	}
+	_ = fs.Parse(flagArgs)
 	ctx, err := parseContext(ctxList)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	f, err := parser.ParseFile(fs.Arg(0))
+	f, err := parser.ParseFile(fileArg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
