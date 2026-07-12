@@ -54,6 +54,9 @@ type Decision struct {
 
 // Decode parses an AST into a validated access_policy.
 func Decode(f *ast.File) (*Policy, error) {
+	if f == nil {
+		return nil, fmt.Errorf("Decode requires non-nil ast.File")
+	}
 	if f.Type != "access_policy" {
 		return nil, fmt.Errorf("expected access_policy, got %q", f.Type)
 	}
@@ -388,6 +391,9 @@ func validateRule(r Rule, reg *extension.Registry) error {
 
 // ValidatePolicy checks that an access policy has valid rules and operator references.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
+	if p == nil {
+		return fmt.Errorf("ValidatePolicy requires non-nil Policy")
+	}
 	if !policy.IsEffect(string(p.Default)) {
 		return fmt.Errorf("invalid default effect %q", p.Default)
 	}
@@ -413,6 +419,9 @@ func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 // After the never pre-pass, regular rules are iterated in order, applying the
 // strongest matching effect.
 func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
+	if p == nil {
+		return Decision{Effect: policy.EffectNever, Errors: []string{"Evaluate requires non-nil Policy"}}
+	}
 	decision := policy.Effect("")
 	matched := []string{}
 	ctx := condition.EvalContext{}
