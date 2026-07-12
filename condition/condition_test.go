@@ -27,9 +27,12 @@ func TestConditionMissingAndCustomOperator(t *testing.T) {
 	}
 
 	reg := extension.NewRegistry()
-	reg.RegisterOperator("within_cidr", func(left any, right any) bool {
+	err = reg.RegisterOperator("within_cidr", func(left any, right any) bool {
 		return left == "10.1.2.3" && right == "10.0.0.0/8"
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	ok, err = condition.Evaluate(cond, condition.EvalContext{"request.ip": "10.1.2.3"}, reg)
 	if err != nil {
 		t.Fatal(err)
@@ -268,10 +271,13 @@ access "site":
 
 func TestNilCustomOperatorDoesNotPanic(t *testing.T) {
 	reg := extension.NewRegistry()
-	reg.RegisterOperator("nilop", nil)
-	_, err := condition.Evaluate(condition.Condition{Field: "x", Op: "nilop", Value: "y"}, condition.EvalContext{"x": "z"}, reg)
+	err := reg.RegisterOperator("nilop", nil)
 	if err == nil {
-		t.Fatal("expected nil custom operator to be ignored and reported as unknown")
+		t.Fatal("expected error for nil operator registration")
+	}
+	_, err = condition.Evaluate(condition.Condition{Field: "x", Op: "nilop", Value: "y"}, condition.EvalContext{"x": "z"}, reg)
+	if err == nil {
+		t.Fatal("expected nil custom operator to be rejected and reported as unknown")
 	}
 }
 
@@ -318,10 +324,13 @@ func TestContainsSupportsMapKeys(t *testing.T) {
 
 func TestCustomOperatorPanicReturnsError(t *testing.T) {
 	reg := extension.NewRegistry()
-	reg.RegisterOperator("boom", func(left any, right any) bool {
+	err := reg.RegisterOperator("boom", func(left any, right any) bool {
 		panic("boom")
 	})
-	_, err := condition.Evaluate(condition.Condition{Field: "x", Op: "boom", Value: "y"}, condition.EvalContext{"x": "z"}, reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = condition.Evaluate(condition.Condition{Field: "x", Op: "boom", Value: "y"}, condition.EvalContext{"x": "z"}, reg)
 	if err == nil {
 		t.Fatal("expected custom operator panic to be returned as error")
 	}
