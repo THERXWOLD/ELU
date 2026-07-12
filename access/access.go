@@ -32,6 +32,7 @@ type Policy struct {
 	Name          string
 	Default       policy.Effect
 	DeclaredRoles []string
+	NeverRules    []Rule
 	Rules         []Rule
 }
 
@@ -101,7 +102,7 @@ func Decode(f *ast.File) (*Policy, error) {
 					return nil, fmt.Errorf("duplicate role %q", child.Name)
 				}
 				seenRoles[child.Name] = true
-				rules, err := decodeRoleRules(child)
+				rules, neverRules, err := decodeRoleRules(child)
 				if err != nil {
 					return nil, err
 				}
@@ -115,6 +116,7 @@ func Decode(f *ast.File) (*Policy, error) {
 					}
 					p.Rules = append(p.Rules, r)
 				}
+				p.NeverRules = append(p.NeverRules, neverRules...)
 			case "rule":
 				r, err := decodeExplicitRule(child, "")
 				if err != nil {
@@ -138,7 +140,11 @@ func Decode(f *ast.File) (*Policy, error) {
 				if err != nil {
 					return nil, err
 				}
-				p.Rules = append(p.Rules, rules...)
+				if policy.Effect(child.Key) == policy.EffectNever {
+					p.NeverRules = append(p.NeverRules, rules...)
+				} else {
+					p.Rules = append(p.Rules, rules...)
+				}
 			} else if child.Key == "roles" {
 				if seenSections[child.Key] {
 					return nil, fmt.Errorf("duplicate access section %q at line %d", child.Key, child.Line)
@@ -173,43 +179,51 @@ func Decode(f *ast.File) (*Policy, error) {
 }
 
 // decodeRoleRules extracts rules from a role block.
-func decodeRoleRules(role *ast.Node) ([]Rule, error) {
-	var rules []Rule
+// Returns regular rules and never rules separately.
+func decodeRoleRules(role *ast.Node) (rules, neverRules []Rule, err error) {
 	seen := map[string]bool{}
 	seenSections := map[string]bool{}
 	for _, child := range role.Children {
 		switch child.Kind {
 		case ast.NodeSection:
 			if !policy.IsEffect(child.Key) {
-				return nil, fmt.Errorf("unknown section %q in role %q at line %d", child.Key, role.Name, child.Line)
+				return nil, nil, fmt.Errorf("unknown section %q in role %q at line %d", child.Key, role.Name, child.Line)
 			}
 			if seenSections[child.Key] {
-				return nil, fmt.Errorf("duplicate section %q in role %q at line %d", child.Key, role.Name, child.Line)
+				return nil, nil, fmt.Errorf("duplicate section %q in role %q at line %d", child.Key, role.Name, child.Line)
 			}
 			seenSections[child.Key] = true
 			rs, err := decodeEffectSection(role.Name, policy.Effect(child.Key), child)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
-			rules = append(rules, rs...)
+			if policy.Effect(child.Key) == policy.EffectNever {
+				neverRules = append(neverRules, rs...)
+			} else {
+				rules = append(rules, rs...)
+			}
 		case ast.NodeBlock:
 			if child.Key != "rule" {
-				return nil, fmt.Errorf("unknown block %q in role %q at line %d", child.Key, role.Name, child.Line)
+				return nil, nil, fmt.Errorf("unknown block %q in role %q at line %d", child.Key, role.Name, child.Line)
 			}
 			r, err := decodeExplicitRule(child, role.Name)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if seen[r.Name] {
-				return nil, fmt.Errorf("duplicate rule %q for role %q", r.Name, role.Name)
+				return nil, nil, fmt.Errorf("duplicate rule %q for role %q", r.Name, role.Name)
 			}
 			seen[r.Name] = true
-			rules = append(rules, r)
+			if r.Effect == policy.EffectNever {
+				neverRules = append(neverRules, r)
+			} else {
+				rules = append(rules, r)
+			}
 		default:
-			return nil, fmt.Errorf("invalid item in role %q at line %d", role.Name, child.Line)
+			return nil, nil, fmt.Errorf("invalid item in role %q at line %d", role.Name, child.Line)
 		}
 	}
-	return rules, nil
+	return rules, neverRules, nil
 }
 
 // decodeEffectSection decodes a shorthand effect section (allow/deny/etc)
@@ -353,32 +367,51 @@ func stringListSection(sec *ast.Node) ([]string, error) {
 	return out, nil
 }
 
+// validateRule checks a single rule for valid fields and operator references.
+func validateRule(r Rule, reg *extension.Registry) error {
+	if !policy.IsEffect(string(r.Effect)) {
+		return fmt.Errorf("rule %q has invalid effect %q", r.Name, r.Effect)
+	}
+	if r.Action == "" {
+		return fmt.Errorf("rule %q has empty action", r.Name)
+	}
+	if r.Resource == "" {
+		return fmt.Errorf("rule %q has empty resource", r.Name)
+	}
+	if r.Condition != nil {
+		if err := condition.ValidateOperators(*r.Condition, reg); err != nil {
+			return fmt.Errorf("rule %q has invalid condition: %w", r.Name, err)
+		}
+	}
+	return nil
+}
+
 // ValidatePolicy checks that an access policy has valid rules and operator references.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 	if !policy.IsEffect(string(p.Default)) {
 		return fmt.Errorf("invalid default effect %q", p.Default)
 	}
+	for _, r := range p.NeverRules {
+		if err := validateRule(r, reg); err != nil {
+			return err
+		}
+	}
 	for _, r := range p.Rules {
-		if !policy.IsEffect(string(r.Effect)) {
-			return fmt.Errorf("rule %q has invalid effect %q", r.Name, r.Effect)
-		}
-		if r.Action == "" {
-			return fmt.Errorf("rule %q has empty action", r.Name)
-		}
-		if r.Resource == "" {
-			return fmt.Errorf("rule %q has empty resource", r.Name)
-		}
-		if r.Condition != nil {
-			if err := condition.ValidateOperators(*r.Condition, reg); err != nil {
-				return fmt.Errorf("rule %q has invalid condition: %w", r.Name, err)
-			}
+		if err := validateRule(r, reg); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 // Evaluate runs a request through the policy and returns a decision.
-// It iterates rules in order, applying the strongest matching effect.
+// Never rules are evaluated first as a mandatory pre-pass. If any never rule
+// matches the request (role, action, resource, and optional condition all
+// satisfied), the decision is EffectNever — regardless of what any other rule
+// says. Condition errors on never rules also produce EffectNever (fail-closed).
+//
+// After the never pre-pass, regular rules are iterated in order, applying the
+// strongest matching effect.
 func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	decision := policy.Effect("")
 	matched := []string{}
@@ -393,6 +426,27 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	if _, ok := ctx["resource"]; !ok {
 		ctx["resource"] = req.Resource
 		ctx["resource.type"] = req.Resource
+	}
+	for _, r := range p.NeverRules {
+		if r.Role != "" && !hasRole(req.Roles, r.Role) {
+			continue
+		}
+		if !matchAction(r.Action, req.Action) {
+			continue
+		}
+		if !matchResource(r.Resource, req.Resource) {
+			continue
+		}
+		if r.Condition != nil {
+			ok, err := condition.EvaluateStrict(*r.Condition, ctx, reg)
+			if err != nil {
+				return Decision{Effect: policy.EffectNever, Errors: []string{fmt.Sprintf("never rule %q condition error: %v", r.Name, err)}}
+			}
+			if !ok {
+				continue
+			}
+		}
+		return Decision{Effect: policy.EffectNever, MatchedRules: []string{r.Name}}
 	}
 	for _, r := range p.Rules {
 		if r.Role != "" && !hasRole(req.Roles, r.Role) {
