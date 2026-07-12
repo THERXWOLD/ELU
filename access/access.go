@@ -247,8 +247,11 @@ func decodeEffectSection(role string, effect policy.Effect, sec *ast.Node) ([]Ru
 				return nil, fmt.Errorf("empty resource in action %q at line %d", action, item.Line)
 			}
 			rules = append(rules, Rule{
-				Role: role, Effect: effect, Action: action, Resource: res,
-				Name: string(effect) + "." + action + "." + res,
+				Role:     role,
+				Effect:   effect,
+				Action:   action,
+				Resource: res,
+				Name:     fmt.Sprintf("%s:%s.%s.%s", role, string(effect), action, res),
 			})
 		}
 	}
@@ -261,6 +264,7 @@ func decodeExplicitRule(n *ast.Node, role string) (Rule, error) {
 	if r.Name == "" {
 		return r, fmt.Errorf("rule at line %d requires a name", n.Line)
 	}
+	// Looking for effect named rule field, if not found, return error
 	if v, ok := ast.FindAssign(n.Children, "effect"); ok {
 		r.Effect = policy.Effect(v.StringValue())
 		if !policy.IsEffect(string(r.Effect)) {
@@ -269,6 +273,7 @@ func decodeExplicitRule(n *ast.Node, role string) (Rule, error) {
 	} else {
 		return r, fmt.Errorf("rule %q is missing required field effect", r.Name)
 	}
+	// Looking for action named rule field, if not found, return error
 	if v, ok := ast.FindAssign(n.Children, "action"); ok {
 		r.Action = v.StringValue()
 		if r.Action == "" {
@@ -280,6 +285,7 @@ func decodeExplicitRule(n *ast.Node, role string) (Rule, error) {
 	} else {
 		return r, fmt.Errorf("rule %q is missing required field action", r.Name)
 	}
+	// Looking for resource named rule field, if not found, return error
 	if v, ok := ast.FindAssign(n.Children, "resource"); ok {
 		r.Resource = v.StringValue()
 		if r.Resource == "" {
