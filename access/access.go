@@ -69,6 +69,9 @@ func Decode(f *ast.File) (*Policy, error) {
 			block = n
 			continue
 		}
+		if n.Kind == ast.NodeAssign {
+			continue
+		}
 		return nil, fmt.Errorf("unexpected top-level %s %q at line %d in access_policy", n.Kind, n.Key, n.Line)
 	}
 	if block == nil {
@@ -417,7 +420,9 @@ func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 // says. Condition errors on never rules also produce EffectNever (fail-closed).
 //
 // After the never pre-pass, regular rules are iterated in order, applying the
-// strongest matching effect.
+// strongest matching effect. Condition errors on regular rules are aggregated:
+// all rules are evaluated and all errors are reported, but any error still
+// produces EffectNever (fail-closed).
 func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	if p == nil {
 		return Decision{Effect: policy.EffectNever, Errors: []string{"Evaluate requires non-nil Policy"}}
@@ -457,6 +462,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		}
 		return Decision{Effect: policy.EffectNever, MatchedRules: []string{r.Name}}
 	}
+	var errs []string
 	for _, r := range p.Rules {
 		if r.Role != "" && !hasRole(req.Roles, r.Role) {
 			continue
@@ -470,7 +476,8 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		if r.Condition != nil {
 			ok, err := condition.EvaluateStrict(*r.Condition, ctx, reg)
 			if err != nil {
-				return Decision{Effect: policy.EffectNever, Errors: []string{fmt.Sprintf("rule %q condition error: %v", r.Name, err)}}
+				errs = append(errs, fmt.Sprintf("rule %q condition error: %v", r.Name, err))
+				continue
 			}
 			if !ok {
 				continue
@@ -481,10 +488,13 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 			decision = r.Effect
 		}
 	}
+	if len(errs) > 0 {
+		decision = policy.EffectNever
+	}
 	if decision == "" {
 		decision = p.Default
 	}
-	return Decision{Effect: decision, MatchedRules: matched}
+	return Decision{Effect: decision, MatchedRules: matched, Errors: errs}
 }
 
 // hasRole checks if a role is in a list of roles.

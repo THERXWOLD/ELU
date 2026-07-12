@@ -741,7 +741,7 @@ func evalOp(op string, left, right any, reg *extension.Registry, opts EvalOption
 				if fn == nil {
 					return false, fmt.Errorf("operator %q is registered with nil implementation", op)
 				}
-				return callCustomOperator(op, fn, left, right)
+				return callCustomOperator(op, reg, fn, left, right)
 			}
 		}
 		return false, fmt.Errorf("unknown operator %q", op)
@@ -749,9 +749,17 @@ func evalOp(op string, left, right any, reg *extension.Registry, opts EvalOption
 	return false, fmt.Errorf("unhandled operator %q", op)
 }
 
-// callCustomOperator wraps a custom operator call in a panic recovery.
-// If the operator panics, we return false instead of crashing.
-func callCustomOperator(op string, fn extension.OperatorFunc, left, right any) (ok bool, err error) {
+// callCustomOperator wraps a custom operator call in a panic recovery and
+// validates argument types if the operator has a registered spec.
+func callCustomOperator(op string, reg *extension.Registry, fn extension.OperatorFunc, left, right any) (ok bool, err error) {
+	if spec, ok := reg.OperatorSpec(op); ok {
+		if spec.LeftType != 0 && reflect.TypeOf(left).Kind() != spec.LeftType {
+			return false, fmt.Errorf("operator %q expects left operand of type %s, got %T", op, spec.LeftType, left)
+		}
+		if spec.RightType != 0 && reflect.TypeOf(right).Kind() != spec.RightType {
+			return false, fmt.Errorf("operator %q expects right operand of type %s, got %T", op, spec.RightType, right)
+		}
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			ok = false

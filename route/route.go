@@ -417,18 +417,24 @@ func validateRouteConflicts(routes []Route) error {
 
 // routesOverlap checks if two route patterns could match the same path.
 func routesOverlap(a, b string) bool {
+	a = normalizePath(a)
+	b = normalizePath(b)
 	if a == b {
-		return true
-	}
-	if glob.Match(a, b) || glob.Match(b, a) {
 		return true
 	}
 	return segmentsOverlap(a, b)
 }
 
-// segmentsOverlap checks if two route patterns can match the same concrete
-// path by comparing their segments pairwise. This catches overlaps that
-// simple glob matching misses when both patterns contain metacharacters.
+// normalizePath removes duplicate slashes and trims trailing slashes.
+func normalizePath(p string) string {
+	for strings.Contains(p, "//") {
+		p = strings.ReplaceAll(p, "//", "/")
+	}
+	return strings.TrimSuffix(p, "/")
+}
+
+// segmentsOverlap checks if two normalized route patterns can match the same
+// concrete path by comparing their segments pairwise.
 func segmentsOverlap(a, b string) bool {
 	sa := splitRoutePath(a)
 	sb := splitRoutePath(b)
@@ -479,11 +485,44 @@ func segmentCanMatch(a, b string) bool {
 	if a == "*" || b == "*" {
 		return true
 	}
-	if !hasRouteMetachar(a) {
+	ha := hasRouteMetachar(a)
+	hb := hasRouteMetachar(b)
+	if !ha && !hb {
+		return a == b
+	}
+	if ha != hb {
+		if ha {
+			return glob.Match(a, b)
+		}
 		return glob.Match(b, a)
 	}
-	if !hasRouteMetachar(b) {
-		return glob.Match(a, b)
+	return segmentPatternsOverlap(a, b)
+}
+
+// splitLiteralBounds returns the literal string before the first metachar
+// and after the last metachar in a glob pattern.
+func splitLiteralBounds(s string) (string, string) {
+	i := strings.IndexAny(s, "*?")
+	if i < 0 {
+		return s, s
+	}
+	j := strings.LastIndexAny(s, "*?")
+	return s[:i], s[j+1:]
+}
+
+// segmentPatternsOverlap checks if two glob patterns could match the same
+// string by comparing their literal prefix and suffix portions.
+func segmentPatternsOverlap(a, b string) bool {
+	if glob.Match(a, b) || glob.Match(b, a) {
+		return true
+	}
+	preA, sufA := splitLiteralBounds(a)
+	preB, sufB := splitLiteralBounds(b)
+	if !strings.HasPrefix(preA, preB) && !strings.HasPrefix(preB, preA) {
+		return false
+	}
+	if !strings.HasSuffix(sufA, sufB) && !strings.HasSuffix(sufB, sufA) {
+		return false
 	}
 	return true
 }
