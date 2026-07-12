@@ -51,9 +51,17 @@ func IsImplementedPackType(typ string) bool {
 	return false
 }
 
+// noCopy is a marker type to prevent copying of Registry instances.
+type noCopy struct{}
+
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}
+
+
 // Registry is a thread-safe container for operators, pack types, and validators.
 // Use NewRegistry to get one with the built-in types preloaded.
 type Registry struct {
+	_          noCopy
 	mu         sync.RWMutex
 	operators  map[string]OperatorFunc
 	packTypes  map[string]bool
