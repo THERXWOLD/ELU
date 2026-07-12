@@ -155,6 +155,11 @@ func expandDoubleStar(pattern string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
+		// checking if is symlink
+		if d.Type()&os.ModeSymlink != 0 {
+			// skip symlinks to avoid infinite loops
+			return nil
+		}
 		if eluglob.Match(cleaned, path) {
 			out = append(out, path)
 		}
