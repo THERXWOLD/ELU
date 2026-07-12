@@ -27,6 +27,7 @@ import (
 	"github.com/therxwold/elu/value"
 )
 
+// main is the entry point for the ELU CLI.
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -47,10 +48,12 @@ func main() {
 	}
 }
 
+// usage prints the usage message for the ELU CLI.
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: elu <check|fmt|ast|explain> [options] [files...]")
 }
 
+// check validates the specified files and reports any issues found.
 func check(args []string) {
 	fs := flag.NewFlagSet("check", flag.ExitOnError)
 	strict := fs.Bool("strict", false, "reject unknown pack types")
@@ -90,6 +93,7 @@ func check(args []string) {
 	}
 }
 
+// matchGlob checks if a value matches a glob pattern. It returns true if the value matches the pattern, false otherwise.
 func expandInputs(args []string) ([]string, error) {
 	var out []string
 	seen := map[string]bool{}
@@ -111,6 +115,9 @@ func expandInputs(args []string) ([]string, error) {
 	return out, nil
 }
 
+// expandPattern expands a glob pattern into a list of matching files.
+// If the pattern contains no glob characters, it returns nil to indicate that
+// the caller should treat it as a literal file path.
 func expandPattern(pattern string) ([]string, error) {
 	if !hasGlob(pattern) {
 		return nil, nil
@@ -121,10 +128,14 @@ func expandPattern(pattern string) ([]string, error) {
 	return filepath.Glob(pattern)
 }
 
+// hasGlob reports whether a string contains glob characters.
+// This is a simple heuristic and does not guarantee that the string is a valid glob pattern.
 func hasGlob(s string) bool {
 	return strings.ContainsAny(s, "*?[")
 }
 
+// expandDoubleStar expands a glob pattern containing "**" into a list of matching files.
+// It walks the filesystem to find matches, because filepath.Glob does not support "**".
 func expandDoubleStar(pattern string) ([]string, error) {
 	cleaned := filepath.Clean(pattern)
 	idx := strings.Index(cleaned, "**")
@@ -152,6 +163,7 @@ func expandDoubleStar(pattern string) ([]string, error) {
 	return out, err
 }
 
+// ast prints the abstract syntax tree for the specified file.
 func ast(args []string) {
 	fs := flag.NewFlagSet("ast", flag.ExitOnError)
 	_ = fs.Parse(args)
@@ -166,9 +178,13 @@ func ast(args []string) {
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(f)
+	err = enc.Encode(f)
+	if err != nil {
+		fatal(err)
+	}
 }
 
+// fmtCmd formats the specified files.
 func fmtCmd(args []string) {
 	fs := flag.NewFlagSet("fmt", flag.ExitOnError)
 	checkOnly := fs.Bool("check", false, "check whether files are formatted without writing")
@@ -218,14 +234,19 @@ func fmtCmd(args []string) {
 	}
 }
 
+// stringList is a list of strings for use with flag.Var. It allows repeated flags to accumulate values.
 type stringList []string
 
+// String returns the string representation of the stringList, which is a comma-separated list of values.
 func (s *stringList) String() string { return strings.Join(*s, ",") }
 func (s *stringList) Set(v string) error {
 	*s = append(*s, v)
 	return nil
 }
 
+// explain explains the evaluation of a policy file.
+// It supports access_policy, repo_policy, and route_policy types. It takes various flags to specify the request context for evaluation.
+// The result is printed in JSON format by default, but can be printed in a human-readable format if the --json flag is not set.
 func explain(args []string) {
 	// Allow both `elu explain file.elu --action read ...` and
 	// `elu explain --action read ... file.elu`. The standard flag package stops
@@ -308,17 +329,25 @@ func explain(args []string) {
 	if *jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		_ = enc.Encode(result)
+		err = enc.Encode(result)
+		if err != nil {
+			fatal(err)
+		}
 		return
 	}
-	printExplain(result)
+	err = printExplain(result)
+	if err != nil {
+		fatal(err)
+	}
 }
 
+// fatal prints an error message to stderr and exits the program with a non-zero status code.
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
 }
 
+// parseContext parses a list of context key=value strings into a condition.EvalContext map.
 func parseContext(items []string) (condition.EvalContext, error) {
 	ctx := condition.EvalContext{}
 	for _, item := range items {
@@ -335,7 +364,12 @@ func parseContext(items []string) (condition.EvalContext, error) {
 	return ctx, nil
 }
 
-func printExplain(v any) {
-	b, _ := json.MarshalIndent(v, "", "  ")
+// printExplain prints the evaluation result in a human-readable format.
+func printExplain(v any) error {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal explain result: %w", err)
+	}
 	fmt.Println(string(b))
+	return nil
 }
