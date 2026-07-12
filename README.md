@@ -36,18 +36,18 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-narukoshin               13 commits          ████████████░░░░░░░░░░░░░   48.15 % 
-github-actions[bot]      9 commits           ████████░░░░░░░░░░░░░░░░░   33.33 % 
-eluuna461                5 commits           █████░░░░░░░░░░░░░░░░░░░░   18.52 % 
+narukoshin               14 commits          ████████████░░░░░░░░░░░░░   50.00 % 
+github-actions[bot]      9 commits           ████████░░░░░░░░░░░░░░░░░   32.14 % 
+eluuna461                5 commits           ████░░░░░░░░░░░░░░░░░░░░░   17.86 % 
 ```
 
 🕐 **Recent Commits** 
 
 ```text
-湖心なる: Merge pull request commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-Naru K: bugfix: fail-closcommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-Naru K: adding ci workflocommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+narukoshin: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+Naru K: bugfix: fail-closcommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+Naru K: adding ci workflocommit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 narukoshin: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
