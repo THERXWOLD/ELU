@@ -1,0 +1,233 @@
+name: AI Code Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or commit SHA to scan'
+        required: true
+        default: 'main'
+      base_ref:
+        description: 'Only scan changes since this ref (leave empty for full scan)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '0 8 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-review-${{ github.event_name == 'schedule' && 'scheduled' || github.event.inputs.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan with Codex
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      findings: ${{ steps.parse.outputs.findings }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'main' || github.event.inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine scan scope
+        id: scope
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # Scan changes since last successful run
+            LAST_SUCCESS=$(git log --all --diff-filter=A --format="%H" -1 -- ".github/workflows/ai-review.yml" 2>/dev/null || true)
+            if [[ -n "$LAST_SUCCESS" ]]; then
+              echo "base_ref=$LAST_SUCCESS" >> $GITHUB_OUTPUT
+            else
+              echo "base_ref=" >> $GITHUB_OUTPUT
+            fi
+          elif [[ -n "${{ github.event.inputs.base_ref }}" ]]; then
+            echo "base_ref=${{ github.event.inputs.base_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "base_ref=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare code for review
+        id: prepare
+        run: |
+          BASE="${{ steps.scope.outputs.base_ref }}"
+          if [[ -n "$BASE" ]]; then
+            # Diff-based: only changes since base ref
+            git diff "$BASE"...HEAD > /tmp/code-to-review.diff
+            DIFF_SIZE=$(wc -c < /tmp/code-to-review.diff)
+            echo "mode=diff" >> $GITHUB_OUTPUT
+          else
+            # Full scan: concatenate all Go source files
+            find . -name '*.go' -not -path './vendor/*' -not -path './.git/*' | sort > /tmp/files.txt
+            while IFS= read -r file; do
+              echo "=== $file ===" >> /tmp/code-to-review.txt
+              cat "$file" >> /tmp/code-to-review.txt
+              echo "" >> /tmp/code-to-review.txt
+            done < /tmp/files.txt
+            DIFF_SIZE=$(wc -c < /tmp/code-to-review.txt)
+            echo "mode=full" >> $GITHUB_OUTPUT
+          fi
+          echo "size=$DIFF_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Truncate if too large
+        if: steps.prepare.outputs.size > 100000
+        run: |
+          echo "Code is large (${{ steps.prepare.outputs.size }} bytes), truncating to last 100KB"
+          if [[ "${{ steps.prepare.outputs.mode }}" == "diff" ]]; then
+            tail -c 100000 /tmp/code-to-review.diff > /tmp/code-to-review.diff.trunc
+            mv /tmp/code-to-review.diff.trunc /tmp/code-to-review.diff
+          else
+            tail -c 100000 /tmp/code-to-review.txt > /tmp/code-to-review.txt.trunc
+            mv /tmp/code-to-review.txt.trunc /tmp/code-to-review.txt
+          fi
+
+      - name: Generate structured prompt
+        id: prompt
+        run: |
+          MODE="${{ steps.prepare.outputs.mode }}"
+          if [[ "$MODE" == "diff" ]]; then
+            DIFF_CONTENT=$(cat /tmp/code-to-review.diff)
+            EOF_MARKER="CODEREVIEW_EOF"
+            cat > /tmp/final-prompt.md << PROMPT_EOF
+          $(cat .github/codex/prompts/review.md)
+
+          The following is a git diff showing changes to review:
+
+          \`\`\`diff
+          ${DIFF_CONTENT}
+          \`\`\`
+
+          Focus on issues introduced in this diff.
+          PROMPT_EOF
+          else
+            CODE_CONTENT=$(cat /tmp/code-to-review.txt)
+            cat > /tmp/final-prompt.md << PROMPT_EOF
+          $(cat .github/codex/prompts/review.md)
+
+          The following is the complete Go source code to review:
+
+          \`\`\`go
+          ${CODE_CONTENT}
+          \`\`\`
+          PROMPT_EOF
+          fi
+
+      - name: Run Codex review
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          sandbox: read-only
+          prompt-file: /tmp/final-prompt.md
+          output-schema-file: .github/codex/output-schema.json
+          output-file: /tmp/codex-output.json
+
+      - name: Parse Codex output
+        id: parse
+        run: |
+          if [[ ! -f /tmp/codex-output.json ]]; then
+            echo "findings=[]" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Validate and extract findings
+          FINDINGS=$(jq -c '.findings // []' /tmp/codex-output.json)
+          echo "findings=$FINDINGS" >> $GITHUB_OUTPUT
+
+          COUNT=$(echo "$FINDINGS" | jq 'length')
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: Upload Codex output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-output
+          path: /tmp/codex-output.json
+
+  create-issues:
+    name: Create issues for findings
+    runs-on: ubuntu-latest
+    needs: scan
+    if: needs.scan.outputs.count && needs.scan.outputs.count != '0'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const findings = JSON.parse(process.env.FINDINGS);
+            const label = 'ai-review';
+
+            // Fetch existing open issues with our label
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 100,
+            });
+            const existingTitles = new Set(existing.data.map(i => i.title));
+
+            const severityEmoji = {
+              critical: '\u{1F534}',
+              high:     '\u{1F7E0}',
+              medium:   '\u{1F7E1}',
+              low:      '\u{1F535}',
+            };
+
+            let created = 0;
+            for (const f of findings) {
+              const emoji = severityEmoji[f.severity] ?? '\u{26AA}';
+              const title = `[AI Review] ${emoji} ${f.title} — ${f.file}:${f.line}`;
+
+              if (existingTitles.has(title)) {
+                core.info(`Issue already exists: ${title}`);
+                continue;
+              }
+
+              const body = [
+                `## AI Code Review Finding`,
+                '',
+                '| Field | Value |',
+                '|-------|-------|',
+                `| **Severity** | \`${f.severity}\` |`,
+                `| **File** | \`${f.file}\` (line ${f.line}) |`,
+                '',
+                '### Description',
+                f.description || '',
+                '',
+                '### Suggestion',
+                f.suggestion || '',
+                '',
+                '> This issue was automatically generated by an AI code review.',
+                '> Findings should be verified by a human before acting on them.',
+              ].join('\n');
+
+              const labels = [label];
+              if (['critical', 'high'].includes(f.severity)) {
+                labels.push('priority: high');
+              }
+
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+
+              existingTitles.add(title);
+              created++;
+              core.notice(`Created issue #${issue.number}: ${issue.html_url}`);
+            }
+
+            core.info(`Done. Created ${created} new issue(s) from ${findings.length} finding(s).`);
+        env:
+          FINDINGS: ${{ needs.scan.outputs.findings }}
