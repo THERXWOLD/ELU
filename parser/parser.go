@@ -15,6 +15,11 @@ import (
 	"github.com/therxwold/elu/value"
 )
 
+const (
+	maxInputSize = 10 * 1024 * 1024 // 10 MB
+	maxNesting   = 100
+)
+
 var (
 	packRE  = regexp.MustCompile(`^pack\s+"([^"]+)"\s+version\s+([0-9]+)\s*$`)
 	keyRE   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
@@ -118,9 +123,17 @@ func ParseString(path, src string) (*ast.File, error) {
 		}
 		parent.node.Children = append(parent.node.Children, n)
 		if n.Kind == ast.NodeListItem && n.Value.Kind == "" && len(n.Children) == 1 && n.Children[0].Kind == ast.NodeSection {
+			if len(stack) >= maxNesting {
+				out = append(out, diag.Diagnostic{Severity: diag.Error, File: path, Line: pl.line, Column: pl.indent + 1, Message: "nesting depth exceeds maximum"})
+				continue
+			}
 			stack = append(stack, frame{indent: pl.indent, node: n})
 			stack = append(stack, frame{indent: pl.indent + 2, node: n.Children[0]})
 		} else if n.Kind == ast.NodeSection || n.Kind == ast.NodeBlock || n.Kind == ast.NodeListItem {
+			if len(stack) >= maxNesting {
+				out = append(out, diag.Diagnostic{Severity: diag.Error, File: path, Line: pl.line, Column: pl.indent + 1, Message: "nesting depth exceeds maximum"})
+				continue
+			}
 			stack = append(stack, frame{indent: pl.indent, node: n})
 		}
 	}
@@ -134,6 +147,9 @@ func ParseString(path, src string) (*ast.File, error) {
 // scanLines tokenizes an ELU source string into lines with indentation info.
 // Rejects tabs and indentation that isn't a multiple of 2.
 func scanLines(path, src string) ([]parsedLine, diag.Diagnostics) {
+	if len(src) > maxInputSize {
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Message: fmt.Sprintf("input size %d exceeds maximum of %d bytes", len(src), maxInputSize)}}
+	}
 	var lines []parsedLine
 	var diags diag.Diagnostics
 	sc := bufio.NewScanner(strings.NewReader(src))
