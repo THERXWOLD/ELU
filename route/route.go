@@ -417,18 +417,24 @@ func validateRouteConflicts(routes []Route) error {
 
 // routesOverlap checks if two route patterns could match the same path.
 func routesOverlap(a, b string) bool {
+	a = normalizePath(a)
+	b = normalizePath(b)
 	if a == b {
-		return true
-	}
-	if glob.Match(a, b) || glob.Match(b, a) {
 		return true
 	}
 	return segmentsOverlap(a, b)
 }
 
-// segmentsOverlap checks if two route patterns can match the same concrete
-// path by comparing their segments pairwise. This catches overlaps that
-// simple glob matching misses when both patterns contain metacharacters.
+// normalizePath removes duplicate slashes and trims trailing slashes.
+func normalizePath(p string) string {
+	for strings.Contains(p, "//") {
+		p = strings.ReplaceAll(p, "//", "/")
+	}
+	return strings.TrimSuffix(p, "/")
+}
+
+// segmentsOverlap checks if two normalized route patterns can match the same
+// concrete path by comparing their segments pairwise.
 func segmentsOverlap(a, b string) bool {
 	sa := splitRoutePath(a)
 	sb := splitRoutePath(b)
@@ -479,13 +485,39 @@ func segmentCanMatch(a, b string) bool {
 	if a == "*" || b == "*" {
 		return true
 	}
-	if !hasRouteMetachar(a) {
+	ha := hasRouteMetachar(a)
+	hb := hasRouteMetachar(b)
+	if !ha && !hb {
+		return a == b
+	}
+	if ha != hb {
+		if ha {
+			return glob.Match(a, b)
+		}
 		return glob.Match(b, a)
 	}
-	if !hasRouteMetachar(b) {
-		return glob.Match(a, b)
+	return segmentPatternsOverlap(a, b)
+}
+
+// segmentPatternsOverlap checks if two glob patterns could match the same string.
+// Both contain metacharacters; we check if either can match the other pattern,
+// or if they share a common concrete prefix/suffix constraint.
+func segmentPatternsOverlap(a, b string) bool {
+	if glob.Match(a, b) || glob.Match(b, a) {
+		return true
 	}
-	return true
+	return hasOverlapConstraint(a) == hasOverlapConstraint(b)
+}
+
+// hasOverlapConstraint reports whether a pattern has literal characters
+// beyond just metacharacters (e.g., "file*" has "file", but "*" and "?*" don't).
+func hasOverlapConstraint(s string) bool {
+	for _, r := range s {
+		if r != '*' && r != '?' {
+			return true
+		}
+	}
+	return false
 }
 
 // hasRouteMetachar checks if a string contains glob metacharacters.
