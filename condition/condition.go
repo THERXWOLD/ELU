@@ -741,7 +741,7 @@ func evalOp(op string, left, right any, reg *extension.Registry, opts EvalOption
 		}
 		return false, fmt.Errorf("unknown operator %q", op)
 	}
-	return false, nil
+	return false, fmt.Errorf("unhandled operator %q", op)
 }
 
 // callCustomOperator wraps a custom operator call in a panic recovery.
