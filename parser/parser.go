@@ -57,10 +57,17 @@ func ParseString(path, src string) (*ast.File, error) {
 	if m == nil {
 		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: `expected pack header: pack "id" version N`}}
 	}
+	// Parse the version number and create the AST file node.
 	version, err := strconv.Atoi(m[2])
 	if err != nil {
 		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: fmt.Sprintf("invalid version number: %v", err)}}
 	}
+
+	// Reject version numbers less than 1, since we don't support them.
+	if version < 1 {
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: fmt.Sprintf("unsupported version number: %d", version)}}
+	}
+
 	f := &ast.File{Path: path, PackID: m[1], Version: version}
 
 	if len(lines) < 2 {
