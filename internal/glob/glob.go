@@ -5,6 +5,7 @@ package glob
 import (
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // Match reports whether value matches pattern using ELU's portable glob syntax.
@@ -26,7 +27,10 @@ func Match(pattern, value string) bool {
 	if strings.HasSuffix(pattern, "/**") && value == strings.TrimSuffix(pattern, "/**") {
 		return true
 	}
-	re := globRegexp(pattern)
+	re, err := globRegexp(pattern)
+	if err != nil {
+		return false
+	}
 	return re.MatchString(value)
 }
 
@@ -36,13 +40,19 @@ func normalize(s string) string {
 	return strings.ReplaceAll(s, "\\", "/")
 }
 
+var cachedRegex = sync.Map{}
+
 // globRegexp compiles a glob pattern into a regexp.
 //
 //   - → [^/]*   (anything but slash)
 //     ?  → [^/]    (one anything-but-slash)
 //     ** → .*      (absolutely everything)
 //     **/ → (?:.*/)? (zero or more directory levels)
-func globRegexp(pattern string) *regexp.Regexp {
+func globRegexp(pattern string) (*regexp.Regexp, error) {
+	// Check the cache first. This is a hot path, and compiling regexps is  expensive.
+	if cached, ok := cachedRegex.Load(pattern); ok {
+		return cached.(*regexp.Regexp), nil
+	}
 	var b strings.Builder
 	b.WriteString("^")
 
@@ -73,5 +83,10 @@ func globRegexp(pattern string) *regexp.Regexp {
 		}
 	}
 	b.WriteString("$")
-	return regexp.MustCompile(b.String())
+	re, err := regexp.Compile(b.String())
+	if err != nil {
+		return nil, err
+	}
+	cachedRegex.Store(pattern, re)
+	return re, nil
 }
