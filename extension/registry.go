@@ -4,8 +4,17 @@ package extension
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 )
+
+// OperatorSpec describes a custom operator with optional argument validation.
+// Zero-value LeftType/RightType mean "any type accepted" for that operand.
+type OperatorSpec struct {
+	Fn        OperatorFunc
+	LeftType  reflect.Kind
+	RightType reflect.Kind
+}
 
 // OperatorFunc evaluates a condition operator at runtime.
 // Takes left and right operands, returns whether the condition holds.
@@ -60,19 +69,21 @@ func (*noCopy) Unlock() {}
 // Registry is a thread-safe container for operators, pack types, and validators.
 // Use NewRegistry to get one with the built-in types preloaded.
 type Registry struct {
-	_          noCopy
-	mu         sync.RWMutex
-	operators  map[string]OperatorFunc
-	packTypes  map[string]bool
-	validators map[string]ValidatorFunc
+	_             noCopy
+	mu            sync.RWMutex
+	operators     map[string]OperatorFunc
+	operatorSpecs map[string]OperatorSpec
+	packTypes     map[string]bool
+	validators    map[string]ValidatorFunc
 }
 
 // NewRegistry creates a registry preloaded with all built-in and future pack types.
 func NewRegistry() *Registry {
 	r := &Registry{
-		operators:  map[string]OperatorFunc{},
-		packTypes:  map[string]bool{},
-		validators: map[string]ValidatorFunc{},
+		operators:     map[string]OperatorFunc{},
+		operatorSpecs: map[string]OperatorSpec{},
+		packTypes:     map[string]bool{},
+		validators:    map[string]ValidatorFunc{},
 	}
 	for _, typ := range ImplementedPackTypes {
 		r.packTypes[typ] = true
@@ -121,6 +132,32 @@ func (r *Registry) RegisterOperator(name string, fn OperatorFunc) error {
 	defer r.mu.Unlock()
 	r.operators[name] = fn
 	return nil
+}
+
+// RegisterOperatorSpec registers a custom operator with optional type validation.
+func (r *Registry) RegisterOperatorSpec(name string, spec OperatorSpec) error {
+	if r == nil {
+		return fmt.Errorf("RegisterOperatorSpec called on nil Registry")
+	}
+	if name == "" || spec.Fn == nil {
+		return fmt.Errorf("invalid operator spec: name=%q, fn=%v", name, spec.Fn)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.operators[name] = spec.Fn
+	r.operatorSpecs[name] = spec
+	return nil
+}
+
+// OperatorSpec returns the registered type spec for an operator name.
+func (r *Registry) OperatorSpec(name string) (OperatorSpec, bool) {
+	if r == nil {
+		return OperatorSpec{}, false
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	spec, ok := r.operatorSpecs[name]
+	return spec, ok
 }
 
 // Operator looks up a registered operator by name.
