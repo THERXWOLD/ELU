@@ -18,7 +18,7 @@ Total: 0
 📋 **Issues** 
 
 ```text
-Open: 0
+Open: 4
 ```
 
 🔀 **Pull Requests** 
@@ -36,19 +36,19 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-narukoshin               14 commits          ████████████░░░░░░░░░░░░░   50.00 % 
-github-actions[bot]      9 commits           ████████░░░░░░░░░░░░░░░░░   32.14 % 
-eluuna461                5 commits           ████░░░░░░░░░░░░░░░░░░░░░   17.86 % 
+narukoshin               45 commits          ███████████████░░░░░░░░░░   61.64 % 
+eluuna461                19 commits          ███████░░░░░░░░░░░░░░░░░░   26.03 % 
+github-actions[bot]      9 commits           ███░░░░░░░░░░░░░░░░░░░░░░   12.33 % 
 ```
 
 🕐 **Recent Commits** 
 
 ```text
-narukoshin: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 湖心なる: Merge pull request commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-Naru K: bugfix: fail-closcommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-Naru K: adding ci workflocommit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+AIRI: fix(access): ignorecommit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
