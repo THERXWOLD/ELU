@@ -34,7 +34,10 @@ func Bytes(path string, src []byte) ([]byte, error) {
 // Path formats the file at path in place. Overwrites the original.
 func Path(path string) error {
 	// removing .tmp file in case of failure
-	
+	err := os.Remove(path + ".tmp")
+	if err != nil {
+		return err
+	}
 
 	b, err := os.ReadFile(path)
 	if err != nil {
