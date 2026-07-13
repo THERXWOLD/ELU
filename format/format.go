@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/therxwold/elu/ast"
@@ -31,17 +32,87 @@ func Bytes(path string, src []byte) ([]byte, error) {
 	return []byte(out), nil
 }
 
-// Path formats the file at path in place. Overwrites the original.
+// Path formats the file at path in place. Overwrites the original. It creates a temp file first, then renames it to the original file.
 func Path(path string) error {
-	b, err := os.ReadFile(path)
+	info, err := os.Lstat(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("inspect %q: %w", path, err)
 	}
-	out, err := Bytes(path, b)
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to format symbolic link %q", path)
+	}
+
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%q is not a regular file", path)
+	}
+
+	input, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("read %q: %w", path, err)
 	}
-	return os.WriteFile(path, out, 0o644)
+
+	// Format the file contents.
+	output, err := Bytes(path, input)
+	if err != nil {
+		return fmt.Errorf("format %q: %w", path, err)
+	}
+
+	// If the formatted output is identical to the input, do nothing.
+	if bytes.Equal(input, output) {
+		return nil
+	}
+
+	dir := filepath.Dir(path)
+	pattern := "." + filepath.Base(path) + ".tmp-*"
+
+	// Create a temporary file in the same directory as the original file.
+	temp, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return fmt.Errorf("create temporary file for %q: %w", path, err)
+	}
+
+	tempPath := temp.Name()
+	tempClosed := false
+	replaced := false
+
+	// Ensure that the temporary file is closed and removed if an error occurs.
+	defer func() {
+		if !tempClosed {
+			_ = temp.Close()
+		}
+
+		if !replaced {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	// Set the temporary file's permissions to match the original file's permissions.
+	if err := temp.Chmod(info.Mode().Perm()); err != nil {
+		return fmt.Errorf("set temporary-file permissions: %w", err)
+	}
+
+	if _, err := temp.Write(output); err != nil {
+		return fmt.Errorf("write formatted data: %w", err)
+	}
+
+	// Sync the temporary file to ensure all data is written to disk.
+	if err := temp.Sync(); err != nil {
+		return fmt.Errorf("sync temporary file: %w", err)
+	}
+
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("close temporary file: %w", err)
+	}
+	tempClosed = true
+
+	// replacing the original file with the temporary file. On Windows, this requires special handling due to file locking.
+	if err := replaceFile(tempPath, path); err != nil {
+		return fmt.Errorf("replace %q: %w", path, err)
+	}
+
+	replaced = true
+	return nil
 }
 
 // File renders a parsed ELU AST back to canonical formatted text.
@@ -50,10 +121,13 @@ func File(f *ast.File) string {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "pack %q version %d\n", f.PackID, f.Version)
 	fmt.Fprintf(&b, "type = %q\n", f.Type)
+	// Render all nodes in the file.
 	for _, n := range f.Nodes {
 		b.WriteByte('\n')
 		writeNode(&b, n, 0)
 	}
+	// Add a newline if the file didn't end with one.
+	// This is important for tools that expect a newline at the end of files.
 	if !bytes.HasSuffix(b.Bytes(), []byte("\n")) {
 		b.WriteByte('\n')
 	}
@@ -65,18 +139,22 @@ func writeNode(b *bytes.Buffer, n *ast.Node, indent int) {
 	pad := strings.Repeat(" ", indent)
 	switch n.Kind {
 	case ast.NodeBlock:
+		// Blocks are rendered as key: name\n{ children }.
 		fmt.Fprintf(b, "%s%s %q:\n", pad, n.Key, n.Name)
 		for _, c := range n.Children {
 			writeNode(b, c, indent+2)
 		}
 	case ast.NodeSection:
+		// Sections are rendered as key:\n{ children }.
 		fmt.Fprintf(b, "%s%s:\n", pad, sectionKey(n.Key))
 		for _, c := range n.Children {
 			writeNode(b, c, indent+2)
 		}
 	case ast.NodeAssign:
+		// Assignments are rendered as key = value\n.
 		fmt.Fprintf(b, "%s%s = %s\n", pad, n.Key, renderValue(n.Value))
 	case ast.NodeListItem:
+		// List items are rendered as either an expression, a value, or a section.
 		writeListItem(b, n, indent)
 	}
 }
@@ -132,13 +210,16 @@ func isBareKey(s string) bool {
 	if s == "" {
 		return false
 	}
+	// Check first rune separately, since it can't be a digit or dot.
 	for i, r := range s {
 		if i == 0 {
+			// Check if the rune is a valid first rune.
 			if !(r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')) {
 				return false
 			}
 			continue
 		}
+		// Check if the rune is a valid identifier rune.
 		if !(r == '_' || r == '.' || r == '-' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
 			return false
 		}
