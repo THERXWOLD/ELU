@@ -31,7 +31,7 @@ func Bytes(path string, src []byte) ([]byte, error) {
 	return []byte(out), nil
 }
 
-// Path formats the file at path in place. Overwrites the original.
+// Path formats the file at path in place. Overwrites the original. It creates a temp file first, then renames it to the original file.
 func Path(path string) error {
 	// removing .tmp file in case of failure
 	err := os.Remove(path + ".tmp")
