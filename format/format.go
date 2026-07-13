@@ -64,7 +64,8 @@ func Path(path string) error {
 	// close the temp file before renaming it to the original file
 	temp.Close()
 	// rename the temp file to the original file
-	err = os.Rename(temp.Name(), path); if err != nil {
+	err = os.Rename(temp.Name(), path)
+	if err != nil {
 		// Windows fallback;
 		// try to delete the original file and rename the temp file to it
 		if runtime.GOOS == "windows" {
@@ -74,7 +75,8 @@ func Path(path string) error {
 				return err
 			}
 			// renaming the temp file to the original file
-			err = os.Rename(temp.Name(), path); if err != nil {
+			err = os.Rename(temp.Name(), path)
+			if err != nil {
 				// restoring the bak file
 				os.Rename(bak, path)
 				return err
