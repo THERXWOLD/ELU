@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/therxwold/elu/ast"
@@ -33,30 +34,40 @@ func Bytes(path string, src []byte) ([]byte, error) {
 
 // Path formats the file at path in place. Overwrites the original. It creates a temp file first, then renames it to the original file.
 func Path(path string) error {
-	// Remove the temp file if it exists.
-	tmpPath := path + ".tmp"
-
-	err := os.Remove(tmpPath)
+	success := false
+	// create a temp file
+	temp, err := os.CreateTemp(filepath.Dir(path), "elu-format-*")
 	if err != nil {
-		// Print a warning if the temp file removal fails.
-		fmt.Fprintf(os.Stderr, "warning: failed to remove temp file %q: %v", tmpPath, err)
+		return err
 	}
+	defer temp.Close()
+	// deleting the temp file in case of crash
+	defer func() {
+		if !success {
+			os.Remove(temp.Name())
+		}
+	}()
+	// read the original file
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	// Format the file and write it back to disk.
-	out, err := Bytes(path, b)
+	// write the formatted file
+	out, err := Bytes(temp.Name(), b)
 	if err != nil {
 		return err
 	}
-
-	// writing to a temp file first, then renaming, to avoid data loss in case of errors
-	err = os.WriteFile(tmpPath, out, 0o644)
+	_, err = temp.Write(out)
 	if err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, path)
+	// rename the temp file to the original file
+	err = os.Rename(temp.Name(), path); if err != nil {
+		return err
+	}
+	// set success to true
+	success = true
+	return nil
 }
 
 // File renders a parsed ELU AST back to canonical formatted text.
