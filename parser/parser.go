@@ -21,10 +21,10 @@ const (
 )
 
 var (
-	packRE  = regexp.MustCompile(`^pack\s+"([^"]+)"\s+version\s+([0-9]+)\s*$`)
-	keyRE   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
-	blockRE = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_.-]*)\s+"([^"]+)"\s*:\s*$`)
-	sectRE  = regexp.MustCompile(`^((?:[A-Za-z_][A-Za-z0-9_.-]*)|\*|"[^"]+")\s*:\s*$`)
+	packRE  *regexp.Regexp
+	keyRE   *regexp.Regexp
+	blockRE *regexp.Regexp
+	sectRE  *regexp.Regexp
 )
 
 // parsedLine holds one non-empty, non-comment line from an .elu file.
@@ -33,6 +33,29 @@ type parsedLine struct {
 	indent int
 	text   string
 	line   int
+}
+
+// init initializes the regexes used by the parser.
+func init() {
+	// Check regexes at init time to avoid panics later.
+	// If it works it works
+	var err error
+	packRE, err = regexp.Compile(`^pack\s+"([^"]+)"\s+version\s+([0-9]+)\s*$`)
+	if err != nil {
+		panic("elu.parser: bad pack regex: " + err.Error())
+	}
+	keyRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+	if err != nil {
+		panic("elu.parser: bad key regex: " + err.Error())
+	}
+	blockRE, err = regexp.Compile(`^([A-Za-z_][A-Za-z0-9_.-]*)\s+"([^"]+)"\s*:\s*$`)
+	if err != nil {
+		panic("elu.parser: bad block regex: " + err.Error())
+	}
+	sectRE, err = regexp.Compile(`^((?:[A-Za-z_][A-Za-z0-9_.-]*)|\*|"[^"]+")\s*:\s*$`)
+	if err != nil {
+		panic("elu.parser: bad section regex: " + err.Error())
+	}
 }
 
 // ParseFile reads a file from disk and parses it into an AST.
