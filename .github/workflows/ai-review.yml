@@ -20,7 +20,7 @@ jobs:
       - uses: Spyced-Concepts/ReviewSentry@v0.3.3-beta
         with:
           ai_api_key:   ${{ secrets.GITHUB_TOKEN }}
-          ai_model:     gpt-4o
+          ai_model:     gpt-5
           ai_provider:  github-models
           pr_number:    ${{ github.event.pull_request.number }}
           pr_title:     ${{ github.event.pull_request.title }}
