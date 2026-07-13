@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/therxwold/elu/ast"
@@ -35,58 +34,84 @@ func Bytes(path string, src []byte) ([]byte, error) {
 
 // Path formats the file at path in place. Overwrites the original. It creates a temp file first, then renames it to the original file.
 func Path(path string) error {
-	success := false
-	// create a temp file
-	temp, err := os.CreateTemp(filepath.Dir(path), "elu-format-*")
+	info, err := os.Lstat(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("inspect %q: %w", path, err)
 	}
-	// deleting the temp file in case of crash
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to format symbolic link %q", path)
+	}
+
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%q is not a regular file", path)
+	}
+
+	input, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %q: %w", path, err)
+	}
+
+	// Format the file contents.
+	output, err := Bytes(path, input)
+	if err != nil {
+		return fmt.Errorf("format %q: %w", path, err)
+	}
+
+	// If the formatted output is identical to the input, do nothing.
+	if bytes.Equal(input, output) {
+		return nil
+	}
+
+	dir := filepath.Dir(path)
+	pattern := "." + filepath.Base(path) + ".tmp-*"
+
+	// Create a temporary file in the same directory as the original file.
+	temp, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return fmt.Errorf("create temporary file for %q: %w", path, err)
+	}
+
+	tempPath := temp.Name()
+	tempClosed := false
+	replaced := false
+
+	// Ensure that the temporary file is closed and removed if an error occurs.
 	defer func() {
-		if !success {
-			os.Remove(temp.Name())
+		if !tempClosed {
+			_ = temp.Close()
+		}
+
+		if !replaced {
+			_ = os.Remove(tempPath)
 		}
 	}()
-	// read the original file
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
+
+	// Set the temporary file's permissions to match the original file's permissions.
+	if err := temp.Chmod(info.Mode().Perm()); err != nil {
+		return fmt.Errorf("set temporary-file permissions: %w", err)
 	}
-	// write the formatted file
-	out, err := Bytes(temp.Name(), b)
-	if err != nil {
-		return err
+
+	if _, err := temp.Write(output); err != nil {
+		return fmt.Errorf("write formatted data: %w", err)
 	}
-	_, err = temp.Write(out)
-	if err != nil {
-		return err
+
+	// Sync the temporary file to ensure all data is written to disk.
+	if err := temp.Sync(); err != nil {
+		return fmt.Errorf("sync temporary file: %w", err)
 	}
-	// close the temp file before renaming it to the original file
-	temp.Close()
-	// rename the temp file to the original file
-	err = os.Rename(temp.Name(), path)
-	if err != nil {
-		// Windows fallback;
-		// try to delete the original file and rename the temp file to it
-		if runtime.GOOS == "windows" {
-			// creating a bak file
-			bak := path + ".bak"
-			if err = os.Rename(path, bak); err != nil {
-				return err
-			}
-			// renaming the temp file to the original file
-			err = os.Rename(temp.Name(), path)
-			if err != nil {
-				// restoring the bak file
-				os.Rename(bak, path)
-				return err
-			}
-			os.Remove(bak)
-			return nil
-		}
-		return err
+
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("close temporary file: %w", err)
 	}
-	success = true
+	tempClosed = true
+
+	// replacing the original file with the temporary file. On Windows, this requires special handling due to file locking.
+	if err := replaceFile(tempPath, path); err != nil {
+		return fmt.Errorf("replace %q: %w", path, err)
+	}
+
+	replaced = true
 	return nil
 }
 
