@@ -4,6 +4,7 @@ package guardrail
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/policy"
@@ -27,6 +28,17 @@ type Guardrail struct {
 	NeverEdit        []string
 	RequiresApproval map[string][]string
 	OnViolation      map[string]string
+}
+
+var actionTokenRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	actionTokenRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
+	if err != nil {
+		panic("elu.guardrail: failed to compile action token regex: " + err.Error())
+	}
 }
 
 // Decode parses an AST into a validated guardrail_pack.
@@ -247,6 +259,10 @@ func actionMap(sec *ast.Node) (map[string][]string, error) {
 		if _, ok := out[child.Key]; ok {
 			return nil, fmt.Errorf("duplicate action section %q at line %d", child.Key, child.Line)
 		}
+		// Check if the action is a valid action token.
+		if !isValidActionToken(child.Key) {
+			return nil, fmt.Errorf("invalid action token %q at line %d", child.Key, child.Line)
+		}
 		xs, err := stringList(child)
 		if err != nil {
 			return nil, err
@@ -275,4 +291,9 @@ func assignMap(sec *ast.Node) (map[string]string, error) {
 		return nil, fmt.Errorf("section %q at line %d must not be empty", sec.Key, sec.Line)
 	}
 	return out, nil
+}
+
+// isValidActionToken checks if a string is a valid action token or wildcard.
+func isValidActionToken(action string) bool {
+	return action == "*" || actionTokenRE.MatchString(action)
 }
