@@ -46,6 +46,18 @@ type Decision struct {
 	Errors       []string
 }
 
+// actionTokenRE validates action tokens.
+var actionTokenRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	actionTokenRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
+	if err != nil {
+		panic("elu.repo: failed to compile action token regex: " + err.Error())
+	}
+}
+
 // Decode parses an AST into a validated repo_policy.
 func Decode(f *ast.File) (*Policy, error) {
 	if f == nil {
@@ -334,9 +346,6 @@ func matchResource(pattern, val string) bool {
 	}
 	return glob.Match(pattern, val)
 }
-
-// actionTokenRE validates action tokens.
-var actionTokenRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
 
 // isValidActionToken checks if a string is a valid action token or wildcard.
 func isValidActionToken(action string) bool {
