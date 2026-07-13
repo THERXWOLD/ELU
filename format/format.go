@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/therxwold/elu/ast"
@@ -40,7 +41,6 @@ func Path(path string) error {
 	if err != nil {
 		return err
 	}
-	defer temp.Close()
 	// deleting the temp file in case of crash
 	defer func() {
 		if !success {
@@ -61,11 +61,29 @@ func Path(path string) error {
 	if err != nil {
 		return err
 	}
+	// close the temp file before renaming it to the original file
+	temp.Close()
 	// rename the temp file to the original file
 	err = os.Rename(temp.Name(), path); if err != nil {
+		// Windows fallback;
+		// try to delete the original file and rename the temp file to it
+		if runtime.GOOS == "windows" {
+			// creating a bak file
+			bak := path + ".bak"
+			if err = os.Rename(path, bak); err != nil {
+				return err
+			}
+			// renaming the temp file to the original file
+			err = os.Rename(temp.Name(), path); if err != nil {
+				// restoring the bak file
+				os.Rename(bak, path)
+				return err
+			}
+			os.Remove(bak)
+			return nil
+		}
 		return err
 	}
-	// set success to true
 	success = true
 	return nil
 }
