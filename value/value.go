@@ -5,6 +5,7 @@
 package value
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -129,6 +130,8 @@ func ParseScalar(raw string, line, col int) (Value, error) {
 	}
 	if i, err := strconv.ParseInt(raw, 10, 64); err == nil && !hasLeadingZero(raw) {
 		return Value{Kind: Int, I: i, Line: line, Col: col}, nil
+	} else if err != nil && errors.Is(err, strconv.ErrRange) {
+		return Value{}, fmt.Errorf("integer %q overflows int64 at line %d", raw, line)
 	}
 	if f, err := strconv.ParseFloat(raw, 64); err == nil && strings.ContainsAny(raw, ".eE") {
 		return Value{Kind: Float, F: f, Line: line, Col: col}, nil
