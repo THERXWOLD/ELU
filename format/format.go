@@ -33,8 +33,12 @@ func Bytes(path string, src []byte) ([]byte, error) {
 
 // Path formats the file at path in place. Overwrites the original. It creates a temp file first, then renames it to the original file.
 func Path(path string) error {
-	// silently remove the temp file if it exists
-	_ = os.Remove(path + ".tmp")
+	// Remove the temp file if it exists.
+	err := os.Remove(path + ".tmp")
+	if err != nil {
+		// Print a warning if the temp file removal fails.
+		fmt.Fprintf(os.Stderr, "warning: failed to remove temp file %q: %v", path+".tmp", err)
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
