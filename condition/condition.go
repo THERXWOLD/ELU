@@ -825,7 +825,12 @@ func floatEqual(a, b float64) bool {
 	if a == b {
 		return true
 	}
-	return math.Abs(a-b) < epsilon
+	// Using relative epsilon to avoid issues with very large or very small numbers.
+	// Epsilon: close enough is considered equal. This is a common approach for floating-point comparisons.
+	// Example: 0.2 + 0.1 = 0.30000000000000004 (without epsilon)
+	// Example: 0.2 + 0.1 = 0.3 (with epsilon)
+	// https://en.wikipedia.org/wiki/Machine_epsilon
+	return math.Abs(a-b) <= epsilon * math.Max(math.Abs(a), math.Abs(b))
 }
 
 // equalityCompatible reports whether eq/neq operands have compatible runtime types.
