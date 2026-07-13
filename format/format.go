@@ -33,15 +33,26 @@ func Bytes(path string, src []byte) ([]byte, error) {
 
 // Path formats the file at path in place. Overwrites the original.
 func Path(path string) error {
+	// removing .tmp file in case of failure
+	
+
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
+	// Format the file and write it back to disk.
 	out, err := Bytes(path, b)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, out, 0o644)
+
+	// writing to a temp file first, then renaming, to avoid data loss in case of errors
+	tmpPath := path + ".tmp"
+	err = os.WriteFile(tmpPath, out, 0o644)
+	if err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 // File renders a parsed ELU AST back to canonical formatted text.
@@ -50,10 +61,13 @@ func File(f *ast.File) string {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "pack %q version %d\n", f.PackID, f.Version)
 	fmt.Fprintf(&b, "type = %q\n", f.Type)
+	// Render all nodes in the file.
 	for _, n := range f.Nodes {
 		b.WriteByte('\n')
 		writeNode(&b, n, 0)
 	}
+	// Add a newline if the file didn't end with one.
+	// This is important for tools that expect a newline at the end of files.
 	if !bytes.HasSuffix(b.Bytes(), []byte("\n")) {
 		b.WriteByte('\n')
 	}
@@ -65,18 +79,22 @@ func writeNode(b *bytes.Buffer, n *ast.Node, indent int) {
 	pad := strings.Repeat(" ", indent)
 	switch n.Kind {
 	case ast.NodeBlock:
+		// Blocks are rendered as key: name\n{ children }.
 		fmt.Fprintf(b, "%s%s %q:\n", pad, n.Key, n.Name)
 		for _, c := range n.Children {
 			writeNode(b, c, indent+2)
 		}
 	case ast.NodeSection:
+		// Sections are rendered as key:\n{ children }.
 		fmt.Fprintf(b, "%s%s:\n", pad, sectionKey(n.Key))
 		for _, c := range n.Children {
 			writeNode(b, c, indent+2)
 		}
 	case ast.NodeAssign:
+		// Assignments are rendered as key = value\n.
 		fmt.Fprintf(b, "%s%s = %s\n", pad, n.Key, renderValue(n.Value))
 	case ast.NodeListItem:
+		// List items are rendered as either an expression, a value, or a section.
 		writeListItem(b, n, indent)
 	}
 }
@@ -132,13 +150,16 @@ func isBareKey(s string) bool {
 	if s == "" {
 		return false
 	}
+	// Check first rune separately, since it can't be a digit or dot.
 	for i, r := range s {
 		if i == 0 {
+			// Check if the rune is a valid first rune.
 			if !(r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')) {
 				return false
 			}
 			continue
 		}
+		// Check if the rune is a valid identifier rune.
 		if !(r == '_' || r == '.' || r == '-' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
 			return false
 		}
