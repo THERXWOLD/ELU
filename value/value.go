@@ -32,10 +32,6 @@ const (
 	List Kind = "list"
 )
 
-// bareIdentRE matches strings that can be used as bare identifiers in ELU.
-// No spaces, no quotes, just good old alphanumeric with some punctuation.
-var bareIdentRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
-
 // Value is the universal ELU runtime value. It carries a Kind tag so you
 // always know what you're looking at, plus a handful of optional fields
 // that only make sense for certain kinds. Line/Col track provenance so
@@ -50,6 +46,19 @@ type Value struct {
 	L    []Value          `json:"l,omitempty"`
 	Line int              `json:"line,omitempty"`
 	Col  int              `json:"col,omitempty"`
+}
+
+// bareIdentRE matches strings that can be used as bare identifiers in ELU.
+// No spaces, no quotes, just good old alphanumeric with some punctuation.
+var bareIdentRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	bareIdentRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+	if err != nil {
+		panic("elu.value: failed to compile bare identifier regex: " + err.Error())
+	}
 }
 
 // VString wraps a string into a Value. Boring but essential.
