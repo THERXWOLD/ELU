@@ -4,14 +4,11 @@ package access
 
 import (
 	"fmt"
-	"maps"
-	"regexp"
-	"slices"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
 	"github.com/therxwold/elu/extension"
-	"github.com/therxwold/elu/internal/glob"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
 	"github.com/therxwold/elu/value"
 )
@@ -260,7 +257,7 @@ func decodeEffectSection(role string, effect policy.Effect, sec *ast.Node) ([]Ru
 			return nil, fmt.Errorf("effect section %q expects action sections at line %d", sec.Key, actionSec.Line)
 		}
 		action := actionSec.Key
-		if !isValidActionToken(action) {
+		if !util.IsValidActionToken(action) {
 			return nil, fmt.Errorf("invalid action %q in effect section %q at line %d", action, sec.Key, actionSec.Line)
 		}
 		if seenActions[action] {
@@ -314,7 +311,7 @@ func decodeExplicitRule(n *ast.Node, role string) (Rule, error) {
 		if r.Action == "" {
 			return r, fmt.Errorf("rule %q has empty action at line %d", r.Name, v.Line)
 		}
-		if !isValidActionToken(r.Action) {
+		if !util.IsValidActionToken(r.Action) {
 			return r, fmt.Errorf("rule %q has invalid action %q at line %d", r.Name, r.Action, v.Line)
 		}
 	} else {
@@ -475,14 +472,13 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		}
 	}
 	for _, r := range p.NeverRules {
-		// Skip rules that don't apply to the requesting role.
-		if r.Role != "" && !hasRole(req.Roles, r.Role) {
+		if r.Role != "" && !util.HasRole(req.Roles, r.Role) {
 			continue
 		}
-		if !matchAction(r.Action, req.Action) {
+		if !util.MatchAction(r.Action, req.Action) {
 			continue
 		}
-		if !matchResource(r.Resource, req.Resource) {
+		if !util.MatchResource(r.Resource, req.Resource) {
 			continue
 		}
 		if r.Condition != nil {
@@ -498,14 +494,13 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	}
 	var errs []string
 	for _, r := range p.Rules {
-		// Skip rules that don't apply to the requesting role.
-		if r.Role != "" && !hasRole(req.Roles, r.Role) {
+		if r.Role != "" && !util.HasRole(req.Roles, r.Role) {
 			continue
 		}
-		if !matchAction(r.Action, req.Action) {
+		if !util.MatchAction(r.Action, req.Action) {
 			continue
 		}
-		if !matchResource(r.Resource, req.Resource) {
+		if !util.MatchResource(r.Resource, req.Resource) {
 			continue
 		}
 		if r.Condition != nil {
@@ -530,29 +525,4 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		decision = p.Default
 	}
 	return Decision{Effect: decision, MatchedRules: matched, Errors: errs}
-}
-
-// hasRole checks if a role is in a list of roles.
-func hasRole(roles []string, role string) bool {
-	return slices.Contains(roles, role)
-}
-
-// matchAction checks if a pattern matches an action.
-// * matches everything, otherwise exact match.
-func matchAction(pattern, val string) bool {
-	return pattern == "*" || pattern == val
-}
-
-// matchResource checks if a resource pattern matches a value.
-// Supports * and glob patterns.
-func matchResource(pattern, val string) bool {
-	if pattern == "*" || pattern == val {
-		return true
-	}
-	return glob.Match(pattern, val)
-}
-
-// isValidActionToken checks if a string is a valid action token or wildcard.
-func isValidActionToken(action string) bool {
-	return action == "*" || actionTokenRE.MatchString(action)
 }

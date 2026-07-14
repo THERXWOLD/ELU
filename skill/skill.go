@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/therxwold/elu/ast"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
-	"github.com/therxwold/elu/value"
 )
 
 // Pack is a decoded skill_pack. Exactly one skill per pack.
@@ -100,55 +100,55 @@ func Decode(f *ast.File) (*Pack, error) {
 				}
 				p.Skill.Uses = uses
 			case "triggers":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.Triggers = xs
 			case "accepts":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.Accepts = xs
 			case "allowed_targets":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.AllowedTargets = xs
 			case "propose_only_targets":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.ProposeOnlyTargets = xs
 			case "approval_targets":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.ApprovalTargets = xs
 			case "forbidden_targets":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.ForbiddenTargets = xs
 			case "steps":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.Steps = xs
 			case "done_when":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
 				p.Skill.DoneWhen = xs
 			case "never":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return nil, err
 				}
@@ -219,13 +219,13 @@ func decodeUses(sec *ast.Node) (Uses, error) {
 		seen[child.Key] = true
 		switch child.Key {
 		case "tools":
-			xs, err := stringList(child)
+			xs, err := util.StringList(child)
 			if err != nil {
 				return u, err
 			}
 			u.Tools = xs
 		case "policies":
-			xs, err := stringList(child)
+			xs, err := util.StringList(child)
 			if err != nil {
 				return u, err
 			}
@@ -235,29 +235,6 @@ func decodeUses(sec *ast.Node) (Uses, error) {
 		}
 	}
 	return u, nil
-}
-
-// stringList extracts a list of strings from a section node.
-func stringList(sec *ast.Node) ([]string, error) {
-	var out []string
-	if len(sec.Children) == 0 {
-		return nil, fmt.Errorf("section %q at line %d must not be empty", sec.Key, sec.Line)
-	}
-	seen := map[string]bool{}
-	for _, item := range sec.Children {
-		if item.Kind != ast.NodeListItem || item.Value.Kind != value.String || len(item.Children) != 0 {
-			return nil, fmt.Errorf("section %q at line %d expects string list items", sec.Key, item.Line)
-		}
-		if item.Value.S == "" {
-			return nil, fmt.Errorf("section %q has empty string item at line %d", sec.Key, item.Line)
-		}
-		if seen[item.Value.S] {
-			return nil, fmt.Errorf("section %q has duplicate item %q", sec.Key, item.Value.S)
-		}
-		seen[item.Value.S] = true
-		out = append(out, item.Value.S)
-	}
-	return out, nil
 }
 
 // overlap checks if two string slices share any element.

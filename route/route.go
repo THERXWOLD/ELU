@@ -11,6 +11,7 @@ import (
 	"github.com/therxwold/elu/condition"
 	"github.com/therxwold/elu/extension"
 	"github.com/therxwold/elu/internal/glob"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
 	"github.com/therxwold/elu/value"
 )
@@ -324,7 +325,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		}
 		// Once method and path match, authorization failures must not fall
 		// through to a more permissive policy default.
-		if r.RequireRole != "" && !hasRole(req.Roles, r.RequireRole) {
+		if r.RequireRole != "" && !util.HasRole(req.Roles, r.RequireRole) {
 			matched = append(matched, r.Name)
 			audit = audit || r.Audit
 			decision = strongerEffect(decision, policy.EffectDeny)
@@ -368,16 +369,6 @@ func strongerEffect(current, candidate policy.Effect) policy.Effect {
 		return candidate
 	}
 	return current
-}
-
-// hasRole checks if a role is in a list of roles.
-func hasRole(roles []string, role string) bool {
-	for _, r := range roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
 }
 
 // isHTTPMethod checks if a string is a valid HTTP method.
