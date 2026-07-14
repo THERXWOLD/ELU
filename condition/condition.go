@@ -808,12 +808,23 @@ func lookupMapKey(container any, key string) (any, bool) {
 
 // compareEqual checks deep equality between two values.
 // Numbers are compared as float64 with an epsilon tolerance,
-// everything else uses reflect.DeepEqual.
+// strings and bools use direct comparison, everything else
+// falls back to reflect.DeepEqual.
 func compareEqual(a, b any) bool {
 	if af, ok := number(a); ok {
 		if bf, ok := number(b); ok {
 			return floatEqual(af, bf)
 		}
+	}
+	switch av := a.(type) {
+	case string:
+		bv, ok := b.(string)
+		return ok && av == bv
+	case bool:
+		bv, ok := b.(bool)
+		return ok && av == bv
+	case nil:
+		return b == nil
 	}
 	return reflect.DeepEqual(a, b)
 }
