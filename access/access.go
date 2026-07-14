@@ -16,7 +16,8 @@ import (
 // Rule is a single access control rule. It matches a role, action, and resource,
 // optionally gated by a condition, and produces an effect (allow/deny/etc).
 type Rule struct {
-	Name      string
+	Name string
+	// Role is the role this rule applies to. If empty, the rule applies to all roles.
 	Role      string
 	Effect    policy.Effect
 	Action    string
@@ -49,6 +50,18 @@ type Decision struct {
 	Effect       policy.Effect
 	MatchedRules []string
 	Errors       []string
+}
+
+// actionTokenRE validates action tokens: alphanumeric with some punctuation.
+var actionTokenRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	actionTokenRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
+	if err != nil {
+		panic("elu.access: failed to compile action token regex: " + err.Error())
+	}
 }
 
 // Decode parses an AST into a validated access_policy.
@@ -429,9 +442,9 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	decision := policy.Effect("")
 	matched := []string{}
 	ctx := condition.EvalContext{}
-	for k, v := range req.Context {
-		ctx[k] = v
-	}
+	// Copy the request context so we can mutate it.
+	maps.Copy(ctx, req.Context)
+
 	ctx["subject.id"] = req.SubjectID
 	ctx["subject.roles"] = req.Roles
 	ctx["request.action"] = req.Action
@@ -439,6 +452,24 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	if _, ok := ctx["resource"]; !ok {
 		ctx["resource"] = req.Resource
 		ctx["resource.type"] = req.Resource
+	}
+	// Add a default resource type context value.
+	// This is useful for some rules that don't have a resource type.
+	if _, ok := ctx["resource.type"]; !ok {
+		setDefault := true
+		switch res := ctx["resource"].(type) {
+		case map[string]any:
+			if _, hasType := res["type"]; hasType {
+				setDefault = false
+			}
+		case map[string]string:
+			if _, hasType := res["type"]; hasType {
+				setDefault = false
+			}
+		}
+		if setDefault {
+			ctx["resource.type"] = req.Resource
+		}
 	}
 	for _, r := range p.NeverRules {
 		if r.Role != "" && !util.HasRole(req.Roles, r.Role) {

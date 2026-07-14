@@ -132,3 +132,24 @@ guardrail "secret":
 		t.Fatal("expected critical guardrail report-only action to fail")
 	}
 }
+
+func TestGuardrailRejectsInvalidActionKey(t *testing.T) {
+	src := `pack "x" version 1
+type = "guardrail_pack"
+
+guardrail "bad":
+  severity = "high"
+  never:
+    - "do something"
+  requires_approval:
+    "has space":
+      - "something"
+`
+	f, err := parser.ParseString("bad.elu", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := guardrail.Decode(f); err == nil {
+		t.Fatal("expected quoted action key with space to be rejected")
+	}
+}

@@ -5,6 +5,7 @@
 package value
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -32,10 +33,6 @@ const (
 	List Kind = "list"
 )
 
-// bareIdentRE matches strings that can be used as bare identifiers in ELU.
-// No spaces, no quotes, just good old alphanumeric with some punctuation.
-var bareIdentRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
-
 // Value is the universal ELU runtime value. It carries a Kind tag so you
 // always know what you're looking at, plus a handful of optional fields
 // that only make sense for certain kinds. Line/Col track provenance so
@@ -50,6 +47,19 @@ type Value struct {
 	L    []Value          `json:"l,omitempty"`
 	Line int              `json:"line,omitempty"`
 	Col  int              `json:"col,omitempty"`
+}
+
+// bareIdentRE matches strings that can be used as bare identifiers in ELU.
+// No spaces, no quotes, just good old alphanumeric with some punctuation.
+var bareIdentRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	bareIdentRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+	if err != nil {
+		panic("elu.value: failed to compile bare identifier regex: " + err.Error())
+	}
 }
 
 // VString wraps a string into a Value. Boring but essential.
@@ -120,6 +130,8 @@ func ParseScalar(raw string, line, col int) (Value, error) {
 	}
 	if i, err := strconv.ParseInt(raw, 10, 64); err == nil && !hasLeadingZero(raw) {
 		return Value{Kind: Int, I: i, Line: line, Col: col}, nil
+	} else if err != nil && errors.Is(err, strconv.ErrRange) {
+		return Value{}, fmt.Errorf("integer %q overflows int64 at line %d", raw, line)
 	}
 	if f, err := strconv.ParseFloat(raw, 64); err == nil && strings.ContainsAny(raw, ".eE") {
 		return Value{Kind: Float, F: f, Line: line, Col: col}, nil
