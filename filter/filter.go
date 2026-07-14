@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/therxwold/elu/ast"
+	"github.com/therxwold/elu/diag"
 	"github.com/therxwold/elu/internal/util"
 )
 
@@ -30,31 +31,44 @@ type Filter struct {
 }
 
 // Decode parses an AST into a validated filter_pack.
+// Returns all errors at once via diag.Diagnostics.
 func Decode(f *ast.File) (*Pack, error) {
 	if f.Type != "filter_pack" {
-		return nil, fmt.Errorf("expected filter_pack, got %q", f.Type)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("expected filter_pack, got %q", f.Type)}}
 	}
 	p := &Pack{PackID: f.PackID, Version: f.Version}
+	var diags diag.Diagnostics
 	seen := map[string]bool{}
 	for _, n := range f.Nodes {
 		if n.Kind != ast.NodeBlock || n.Key != "filter" {
-			return nil, fmt.Errorf("unexpected top-level %s %q at line %d in filter_pack", n.Kind, n.Key, n.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level %s %q in filter_pack", n.Kind, n.Key)})
+			continue
 		}
 		if n.Name == "" {
-			return nil, fmt.Errorf("filter block at line %d requires a name", n.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: "filter block requires a name"})
+			continue
 		}
 		if seen[n.Name] {
-			return nil, fmt.Errorf("duplicate filter %q", n.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("duplicate filter %q", n.Name)})
+			continue
 		}
 		seen[n.Name] = true
 		filt, err := decodeFilter(n)
 		if err != nil {
-			return nil, err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: err.Error()})
+			continue
 		}
 		p.Filters = append(p.Filters, filt)
 	}
 	if err := Validate(p); err != nil {
-		return nil, err
+		if d, ok := err.(diag.Diagnostics); ok {
+			diags = append(diags, d...)
+		} else {
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: err.Error()})
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
 	}
 	return p, nil
 }
@@ -116,32 +130,38 @@ func decodeFilter(n *ast.Node) (Filter, error) {
 }
 
 // Validate checks that a filter_pack has valid structure and coherent actions.
+// Returns all errors at once via diag.Diagnostics.
 func Validate(p *Pack) error {
+	var diags diag.Diagnostics
 	if len(p.Filters) == 0 {
-		return fmt.Errorf("filter_pack requires at least one filter")
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "filter_pack requires at least one filter"})
 	}
 	for _, f := range p.Filters {
 		if f.Name == "" {
-			return fmt.Errorf("filter name must not be empty")
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "filter name must not be empty"})
+			continue
 		}
 		if len(f.AppliesTo) == 0 {
-			return fmt.Errorf("filter %q requires applies_to", f.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("filter %q requires applies_to", f.Name)})
 		}
 		if len(f.Detect) == 0 && len(f.DetectChange) == 0 && len(f.BlockPaths) == 0 {
-			return fmt.Errorf("filter %q requires detect, detect_change, or block_paths", f.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("filter %q requires detect, detect_change, or block_paths", f.Name)})
 		}
 		if len(f.Action) == 0 {
-			return fmt.Errorf("filter %q requires action", f.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("filter %q requires action", f.Name)})
 		}
 		if err := validateActionMap(f.Name, f.Action); err != nil {
-			return err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		}
 		if err := validateDetectorActions(f); err != nil {
-			return err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		}
 		if err := validateEscalateMap(f.Name, f.Escalate); err != nil {
-			return err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		}
+	}
+	if diags.HasErrors() {
+		return diags
 	}
 	return nil
 }

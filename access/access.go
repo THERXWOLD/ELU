@@ -4,9 +4,12 @@ package access
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
+	"github.com/therxwold/elu/diag"
 	"github.com/therxwold/elu/extension"
 	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
@@ -65,18 +68,19 @@ func init() {
 }
 
 // Decode parses an AST into a validated access_policy.
+// Returns all errors at once via diag.Diagnostics rather than stopping at the first.
 func Decode(f *ast.File) (*Policy, error) {
 	if f == nil {
-		return nil, fmt.Errorf("Decode requires non-nil ast.File")
+		return nil, diag.Diagnostics{{Severity: diag.Error, Message: "Decode requires non-nil ast.File"}}
 	}
 	if f.Type != "access_policy" {
-		return nil, fmt.Errorf("expected access_policy, got %q", f.Type)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("expected access_policy, got %q", f.Type)}}
 	}
 	var block *ast.Node
 	for _, n := range f.Nodes {
 		if n.Kind == ast.NodeBlock && n.Key == "access" {
 			if block != nil {
-				return nil, fmt.Errorf("access_policy allows exactly one access block")
+				return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "access_policy allows exactly one access block"}}
 			}
 			block = n
 			continue
@@ -84,18 +88,19 @@ func Decode(f *ast.File) (*Policy, error) {
 		if n.Kind == ast.NodeAssign {
 			continue
 		}
-		return nil, fmt.Errorf("unexpected top-level %s %q at line %d in access_policy", n.Kind, n.Key, n.Line)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level %s %q in access_policy", n.Kind, n.Key)}}
 	}
 	if block == nil {
-		return nil, fmt.Errorf("access_policy requires access block")
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "access_policy requires access block"}}
 	}
 	p := &Policy{PackID: f.PackID, Version: f.Version, Name: block.Name, Default: policy.EffectDeny}
 	if v, ok := ast.FindAssign(block.Children, "default"); ok {
 		p.Default = policy.Effect(v.StringValue())
 		if !policy.IsEffect(string(p.Default)) {
-			return nil, fmt.Errorf("invalid default effect %q at line %d", p.Default, v.Line)
+			return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Line: v.Line, Message: fmt.Sprintf("invalid default effect %q", p.Default)}}
 		}
 	}
+	var diags diag.Diagnostics
 	seenRuleNames := map[string]bool{}
 	seenRoles := map[string]bool{}
 	seenAssigns := map[string]bool{}
@@ -104,31 +109,37 @@ func Decode(f *ast.File) (*Policy, error) {
 		switch child.Kind {
 		case ast.NodeAssign:
 			if child.Key != "default" {
-				return nil, fmt.Errorf("unknown access assignment %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown access assignment %q", child.Key)})
+				continue
 			}
 			if seenAssigns[child.Key] {
-				return nil, fmt.Errorf("duplicate access assignment %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate access assignment %q", child.Key)})
+				continue
 			}
 			seenAssigns[child.Key] = true
 		case ast.NodeBlock:
 			switch child.Key {
 			case "role":
 				if child.Name == "" {
-					return nil, fmt.Errorf("role block at line %d requires a name", child.Line)
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: "role block requires a name"})
+					continue
 				}
 				if seenRoles[child.Name] {
-					return nil, fmt.Errorf("duplicate role %q", child.Name)
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate role %q", child.Name)})
+					continue
 				}
 				seenRoles[child.Name] = true
 				rules, neverRules, err := decodeRoleRules(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				for _, r := range rules {
 					if r.Name != "" {
 						key := r.Role + ":" + r.Name
 						if seenRuleNames[key] {
-							return nil, fmt.Errorf("duplicate rule %q for role %q", r.Name, r.Role)
+							diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate rule %q for role %q", r.Name, r.Role)})
+							continue
 						}
 						seenRuleNames[key] = true
 					}
@@ -138,25 +149,29 @@ func Decode(f *ast.File) (*Policy, error) {
 			case "rule":
 				r, err := decodeExplicitRule(child, "")
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				if seenRuleNames[":"+r.Name] {
-					return nil, fmt.Errorf("duplicate top-level rule %q", r.Name)
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate top-level rule %q", r.Name)})
+					continue
 				}
 				seenRuleNames[":"+r.Name] = true
 				p.Rules = append(p.Rules, r)
 			default:
-				return nil, fmt.Errorf("unknown access block %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown access block %q", child.Key)})
 			}
 		case ast.NodeSection:
 			if policy.IsEffect(child.Key) {
 				if seenSections[child.Key] {
-					return nil, fmt.Errorf("duplicate access section %q at line %d", child.Key, child.Line)
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate access section %q", child.Key)})
+					continue
 				}
 				seenSections[child.Key] = true
 				rules, err := decodeEffectSection("", policy.Effect(child.Key), child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				if policy.Effect(child.Key) == policy.EffectNever {
 					p.NeverRules = append(p.NeverRules, rules...)
@@ -165,21 +180,23 @@ func Decode(f *ast.File) (*Policy, error) {
 				}
 			} else if child.Key == "roles" {
 				if seenSections[child.Key] {
-					return nil, fmt.Errorf("duplicate access section %q at line %d", child.Key, child.Line)
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate access section %q", child.Key)})
+					continue
 				}
 				seenSections[child.Key] = true
 				roles, err := stringListSection(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.DeclaredRoles = roles
 			} else if child.Key == "" {
-				return nil, fmt.Errorf("empty section key at line %d", child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: "empty section key"})
 			} else {
-				return nil, fmt.Errorf("unknown access section %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown access section %q", child.Key)})
 			}
 		case ast.NodeListItem:
-			return nil, fmt.Errorf("unexpected list item in access block at line %d", child.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: "unexpected list item in access block"})
 		}
 	}
 	if len(p.DeclaredRoles) > 0 {
@@ -189,9 +206,12 @@ func Decode(f *ast.File) (*Policy, error) {
 		}
 		for role := range seenRoles {
 			if !declared[role] {
-				return nil, fmt.Errorf("role %q is not declared in roles section", role)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("role %q is not declared in roles section", role)})
 			}
 		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
 	}
 	return p, nil
 }
@@ -405,22 +425,27 @@ func validateRule(r Rule, reg *extension.Registry) error {
 }
 
 // ValidatePolicy checks that an access policy has valid rules and operator references.
+// Returns all errors at once via diag.Diagnostics.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 	if p == nil {
-		return fmt.Errorf("ValidatePolicy requires non-nil Policy")
+		return diag.Diagnostics{{Severity: diag.Error, Message: "ValidatePolicy requires non-nil Policy"}}
 	}
+	var diags diag.Diagnostics
 	if !policy.IsEffect(string(p.Default)) {
-		return fmt.Errorf("invalid default effect %q", p.Default)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("invalid default effect %q", p.Default)})
 	}
 	for _, r := range p.NeverRules {
 		if err := validateRule(r, reg); err != nil {
-			return err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		}
 	}
 	for _, r := range p.Rules {
 		if err := validateRule(r, reg); err != nil {
-			return err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		}
+	}
+	if diags.HasErrors() {
+		return diags
 	}
 	return nil
 }

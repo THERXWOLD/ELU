@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/therxwold/elu/ast"
+	"github.com/therxwold/elu/diag"
 	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
 )
@@ -45,34 +46,37 @@ type Uses struct {
 }
 
 // Decode parses an AST into a validated skill_pack.
+// Returns all errors at once via diag.Diagnostics.
 func Decode(f *ast.File) (*Pack, error) {
 	if f.Type != "skill_pack" {
-		return nil, fmt.Errorf("expected skill_pack, got %q", f.Type)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("expected skill_pack, got %q", f.Type)}}
 	}
 	var block *ast.Node
 	for _, n := range f.Nodes {
 		if n.Kind == ast.NodeBlock && n.Key == "skill" {
 			if block != nil {
-				return nil, fmt.Errorf("skill_pack allows exactly one skill block")
+				return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "skill_pack allows exactly one skill block"}}
 			}
 			block = n
 			continue
 		}
-		return nil, fmt.Errorf("unexpected top-level %s %q at line %d in skill_pack", n.Kind, n.Key, n.Line)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level %s %q in skill_pack", n.Kind, n.Key)}}
 	}
 	if block == nil {
-		return nil, fmt.Errorf("skill_pack requires skill block")
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "skill_pack requires skill block"}}
 	}
 	if block.Name == "" {
-		return nil, fmt.Errorf("skill block at line %d requires a name", block.Line)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Line: block.Line, Message: "skill block requires a name"}}
 	}
 	p := &Pack{PackID: f.PackID, Version: f.Version, Skill: Skill{ID: block.Name}}
+	var diags diag.Diagnostics
 	seen := map[string]bool{}
 	for _, child := range block.Children {
 		switch child.Kind {
 		case ast.NodeAssign:
 			if seen[child.Key] {
-				return nil, fmt.Errorf("skill %q has duplicate field %q at line %d", block.Name, child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("skill %q has duplicate field %q", block.Name, child.Key)})
+				continue
 			}
 			seen[child.Key] = true
 			switch child.Key {
@@ -85,106 +89,126 @@ func Decode(f *ast.File) (*Pack, error) {
 			case "autonomy":
 				p.Skill.Autonomy = child.Value.StringValue()
 			default:
-				return nil, fmt.Errorf("skill %q has unknown field %q at line %d", block.Name, child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("skill %q has unknown field %q", block.Name, child.Key)})
 			}
 		case ast.NodeSection:
 			if seen[child.Key] {
-				return nil, fmt.Errorf("skill %q has duplicate section %q at line %d", block.Name, child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("skill %q has duplicate section %q", block.Name, child.Key)})
+				continue
 			}
 			seen[child.Key] = true
 			switch child.Key {
 			case "uses":
 				uses, err := decodeUses(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.Uses = uses
 			case "triggers":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.Triggers = xs
 			case "accepts":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.Accepts = xs
 			case "allowed_targets":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.AllowedTargets = xs
 			case "propose_only_targets":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.ProposeOnlyTargets = xs
 			case "approval_targets":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.ApprovalTargets = xs
 			case "forbidden_targets":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.ForbiddenTargets = xs
 			case "steps":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.Steps = xs
 			case "done_when":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.DoneWhen = xs
 			case "never":
 				xs, err := util.StringList(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Skill.Never = xs
 			default:
-				return nil, fmt.Errorf("skill %q has unknown section %q at line %d", block.Name, child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("skill %q has unknown section %q", block.Name, child.Key)})
 			}
 		default:
-			return nil, fmt.Errorf("skill %q has invalid child at line %d", block.Name, child.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("skill %q has invalid child", block.Name)})
 		}
 	}
 	if err := Validate(p); err != nil {
-		return nil, err
+		if d, ok := err.(diag.Diagnostics); ok {
+			diags = append(diags, d...)
+		} else {
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: err.Error()})
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
 	}
 	return p, nil
 }
 
 // Validate checks that a skill_pack has the required fields and valid target groups.
+// Returns all errors at once via diag.Diagnostics.
 func Validate(p *Pack) error {
+	var diags diag.Diagnostics
 	if p.Skill.ID == "" {
-		return fmt.Errorf("skill id must not be empty")
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "skill id must not be empty"})
 	}
 	if p.Skill.Category == "" {
-		return fmt.Errorf("skill %q is missing required field category", p.Skill.ID)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("skill %q is missing required field category", p.Skill.ID)})
 	}
 	if p.Skill.Risk == "" {
-		return fmt.Errorf("skill %q is missing required field risk", p.Skill.ID)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("skill %q is missing required field risk", p.Skill.ID)})
 	}
 	if !policy.IsSeverity(p.Skill.Risk) {
-		return fmt.Errorf("skill %q has invalid risk %q", p.Skill.ID, p.Skill.Risk)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("skill %q has invalid risk %q", p.Skill.ID, p.Skill.Risk)})
 	}
 	if len(p.Skill.Steps) == 0 {
-		return fmt.Errorf("skill %q requires at least one step", p.Skill.ID)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("skill %q requires at least one step", p.Skill.ID)})
 	}
 	if len(p.Skill.DoneWhen) == 0 && (p.Skill.Risk == "high" || p.Skill.Risk == "critical") {
-		return fmt.Errorf("skill %q with risk %q requires done_when", p.Skill.ID, p.Skill.Risk)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("skill %q with risk %q requires done_when", p.Skill.ID, p.Skill.Risk)})
 	}
 	targetGroups := []struct {
 		name string
@@ -198,9 +222,12 @@ func Validate(p *Pack) error {
 	for i := 0; i < len(targetGroups); i++ {
 		for j := i + 1; j < len(targetGroups); j++ {
 			if x := overlap(targetGroups[i].xs, targetGroups[j].xs); x != "" {
-				return fmt.Errorf("skill %q target %q appears in both %s and %s", p.Skill.ID, x, targetGroups[i].name, targetGroups[j].name)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("skill %q target %q appears in both %s and %s", p.Skill.ID, x, targetGroups[i].name, targetGroups[j].name)})
 			}
 		}
+	}
+	if diags.HasErrors() {
+		return diags
 	}
 	return nil
 }
