@@ -25,6 +25,9 @@ import (
 	"github.com/therxwold/elu/validate"
 )
 
+// ParseOptions configures parser limits. Type alias for parser.Options.
+type ParseOptions = parser.Options
+
 // Facade exports — the most common types from subpackages, re-exported so you
 // don't have to remember six different import paths. You're welcome.
 
@@ -112,9 +115,19 @@ func NewRegistry() *extension.Registry { return extension.NewRegistry() }
 // ParseFile reads an ELU file from disk and parses it into an AST.
 func ParseFile(path string) (*ast.File, error) { return parser.ParseFile(path) }
 
+// ParseFileWithOptions reads an ELU file from disk with custom parser limits.
+func ParseFileWithOptions(path string, opts parser.Options) (*ast.File, error) {
+	return parser.ParseFileWithOptions(path, opts)
+}
+
 // ParseString parses ELU source text (from a string) into an AST.
 // Path is used for error messages — it doesn't have to be a real file.
 func ParseString(path, src string) (*ast.File, error) { return parser.ParseString(path, src) }
+
+// ParseStringWithOptions parses ELU source text with custom parser limits.
+func ParseStringWithOptions(path, src string, opts parser.Options) (*ast.File, error) {
+	return parser.ParseStringWithOptions(path, src, opts)
+}
 
 // DecodeAccessPolicy decodes a parsed ELU file into an AccessPolicy.
 func DecodeAccessPolicy(f *ast.File) (*access.Policy, error) { return access.Decode(f) }
