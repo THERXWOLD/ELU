@@ -156,7 +156,7 @@ repo "x":
 		t.Fatal("expected validation error without custom operator")
 	}
 	reg := extension.NewRegistry()
-	reg.RegisterOperator("risk_below", func(left, right any) bool { return left == "low" && right == "medium" })
+	reg.RegisterOperator("risk_below", func(left, right any) (bool, error) { return left == "low" && right == "medium", nil })
 	if err := repo.ValidatePolicy(p, reg); err != nil {
 		t.Fatalf("expected validation with registered operator: %v", err)
 	}

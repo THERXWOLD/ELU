@@ -766,7 +766,7 @@ func callCustomOperator(op string, reg *extension.Registry, fn extension.Operato
 			err = fmt.Errorf("operator %q panicked: %v", op, r)
 		}
 	}()
-	return fn(left, right), nil
+	return fn(left, right)
 }
 
 // lookup walks a dot-separated path through an EvalContext map.

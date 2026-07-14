@@ -240,7 +240,7 @@ access "site":
             value = "127.0.0.1"
 `
 	reg := extension.NewRegistry()
-	reg.RegisterOperator("boom", func(left any, right any) bool { panic("boom") })
+	reg.RegisterOperator("boom", func(left any, right any) (bool, error) { panic("boom") })
 	f := mustParseAndValidate(t, "panic.elu", src, reg)
 	p, err := access.Decode(f)
 	if err != nil {
