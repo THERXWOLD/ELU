@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/therxwold/elu/ast"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
-	"github.com/therxwold/elu/value"
 )
 
 // Pack is a decoded guardrail_pack.
@@ -96,19 +96,19 @@ func decodeGuardrail(n *ast.Node) (Guardrail, error) {
 			seen[child.Key] = true
 			switch child.Key {
 			case "applies_to":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return g, err
 				}
 				g.AppliesTo = xs
 			case "never":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return g, err
 				}
 				g.Never = xs
 			case "never_edit":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return g, err
 				}
@@ -214,29 +214,6 @@ func isViolationAction(action string) bool {
 	}
 }
 
-// stringList extracts a list of strings from a section node.
-func stringList(sec *ast.Node) ([]string, error) {
-	if len(sec.Children) == 0 {
-		return nil, fmt.Errorf("section %q at line %d must not be empty", sec.Key, sec.Line)
-	}
-	var out []string
-	seen := map[string]bool{}
-	for _, item := range sec.Children {
-		if item.Kind != ast.NodeListItem || item.Value.Kind != value.String || len(item.Children) != 0 {
-			return nil, fmt.Errorf("section %q at line %d expects string list items", sec.Key, item.Line)
-		}
-		if item.Value.S == "" {
-			return nil, fmt.Errorf("section %q has empty item at line %d", sec.Key, item.Line)
-		}
-		if seen[item.Value.S] {
-			return nil, fmt.Errorf("section %q has duplicate item %q", sec.Key, item.Value.S)
-		}
-		seen[item.Value.S] = true
-		out = append(out, item.Value.S)
-	}
-	return out, nil
-}
-
 // actionMap extracts a map of action → string list from a section node.
 func actionMap(sec *ast.Node) (map[string][]string, error) {
 	out := map[string][]string{}
@@ -247,7 +224,7 @@ func actionMap(sec *ast.Node) (map[string][]string, error) {
 		if _, ok := out[child.Key]; ok {
 			return nil, fmt.Errorf("duplicate action section %q at line %d", child.Key, child.Line)
 		}
-		xs, err := stringList(child)
+		xs, err := util.StringList(child)
 		if err != nil {
 			return nil, err
 		}

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/therxwold/elu/ast"
-	"github.com/therxwold/elu/value"
+	"github.com/therxwold/elu/internal/util"
 )
 
 // Pack is a decoded filter_pack. It holds one or more filter definitions.
@@ -73,25 +73,25 @@ func decodeFilter(n *ast.Node) (Filter, error) {
 		seen[child.Key] = true
 		switch child.Key {
 		case "applies_to":
-			xs, err := stringList(child)
+			xs, err := util.StringList(child)
 			if err != nil {
 				return f, err
 			}
 			f.AppliesTo = xs
 		case "detect":
-			xs, err := stringList(child)
+			xs, err := util.StringList(child)
 			if err != nil {
 				return f, err
 			}
 			f.Detect = xs
 		case "detect_change":
-			xs, err := stringList(child)
+			xs, err := util.StringList(child)
 			if err != nil {
 				return f, err
 			}
 			f.DetectChange = xs
 		case "block_paths":
-			xs, err := stringList(child)
+			xs, err := util.StringList(child)
 			if err != nil {
 				return f, err
 			}
@@ -278,30 +278,6 @@ func isFilterAction(action string) bool {
 	default:
 		return false
 	}
-}
-
-// stringList extracts a list of strings from a section node.
-// Each child must be a list item with a string value.
-func stringList(sec *ast.Node) ([]string, error) {
-	if len(sec.Children) == 0 {
-		return nil, fmt.Errorf("section %q at line %d must not be empty", sec.Key, sec.Line)
-	}
-	var out []string
-	seen := map[string]bool{}
-	for _, item := range sec.Children {
-		if item.Kind != ast.NodeListItem || item.Value.Kind != value.String || len(item.Children) != 0 {
-			return nil, fmt.Errorf("section %q at line %d expects string list items", sec.Key, item.Line)
-		}
-		if item.Value.S == "" {
-			return nil, fmt.Errorf("section %q has empty item at line %d", sec.Key, item.Line)
-		}
-		if seen[item.Value.S] {
-			return nil, fmt.Errorf("section %q has duplicate item %q", sec.Key, item.Value.S)
-		}
-		seen[item.Value.S] = true
-		out = append(out, item.Value.S)
-	}
-	return out, nil
 }
 
 // assignMap extracts a key=value map from a section node.

@@ -4,12 +4,11 @@ package repo
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
 	"github.com/therxwold/elu/extension"
-	"github.com/therxwold/elu/internal/glob"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
 	"github.com/therxwold/elu/value"
 )
@@ -154,7 +153,7 @@ func decodeEffectSection(effect policy.Effect, sec *ast.Node) ([]Rule, error) {
 		if actionSec.Key == "" {
 			return nil, fmt.Errorf("empty action in effect section %q", sec.Key)
 		}
-		if !isValidActionToken(actionSec.Key) {
+		if !util.IsValidActionToken(actionSec.Key) {
 			return nil, fmt.Errorf("invalid action %q in effect section %q at line %d", actionSec.Key, sec.Key, actionSec.Line)
 		}
 		if len(actionSec.Children) == 0 {
@@ -224,7 +223,7 @@ func decodeExplicitRule(n *ast.Node) (Rule, error) {
 	if !seen["action"] || r.Action == "" {
 		return r, fmt.Errorf("rule %q is missing required field action", r.Name)
 	}
-	if !isValidActionToken(r.Action) {
+	if !util.IsValidActionToken(r.Action) {
 		return r, fmt.Errorf("rule %q has invalid action %q", r.Name, r.Action)
 	}
 	if !seen["resource"] || r.Resource == "" {
@@ -283,10 +282,10 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		ctx["resource"] = req.Resource
 	}
 	for _, r := range p.Rules {
-		if !matchAction(r.Action, req.Action) {
+		if !util.MatchAction(r.Action, req.Action) {
 			continue
 		}
-		if !matchResource(r.Resource, req.Resource) {
+		if !util.MatchResource(r.Resource, req.Resource) {
 			continue
 		}
 		if r.Condition != nil {
@@ -320,25 +319,4 @@ func (p *Policy) defaultFor(action string) policy.Effect {
 		}
 	}
 	return policy.EffectDeny
-}
-
-// matchAction checks if a pattern matches an action.
-func matchAction(pattern, val string) bool {
-	return pattern == "*" || pattern == val
-}
-
-// matchResource checks if a resource pattern matches a value.
-func matchResource(pattern, val string) bool {
-	if pattern == "*" || pattern == val {
-		return true
-	}
-	return glob.Match(pattern, val)
-}
-
-// actionTokenRE validates action tokens.
-var actionTokenRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
-
-// isValidActionToken checks if a string is a valid action token or wildcard.
-func isValidActionToken(action string) bool {
-	return action == "*" || actionTokenRE.MatchString(action)
 }
