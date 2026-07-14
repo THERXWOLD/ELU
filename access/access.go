@@ -456,6 +456,24 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		ctx["resource"] = req.Resource
 		ctx["resource.type"] = req.Resource
 	}
+	// Add a default resource type context value.
+	// This is useful for some rules that don't have a resource type.
+	if _, ok := ctx["resource.type"]; !ok {
+		setDefault := true
+		switch res := ctx["resource"].(type) {
+		case map[string]any:
+			if _, hasType := res["type"]; hasType {
+				setDefault = false
+			}
+		case map[string]string:
+			if _, hasType := res["type"]; hasType {
+				setDefault = false
+			}
+		}
+		if setDefault {
+			ctx["resource.type"] = req.Resource
+		}
+	}
 	for _, r := range p.NeverRules {
 		// Skip rules that don't apply to the requesting role.
 		if r.Role != "" && !hasRole(req.Roles, r.Role) {
