@@ -17,9 +17,9 @@ type OperatorSpec struct {
 }
 
 // OperatorFunc evaluates a condition operator at runtime.
-// Takes left and right operands, returns whether the condition holds.
+// Takes left and right operands, returns whether the condition holds and any error.
 // Panics are caught by the caller, so don't worry about crashing the host.
-type OperatorFunc func(left any, right any) bool
+type OperatorFunc func(left any, right any) (bool, error)
 
 // ValidatorFunc validates a pack after it's been parsed.
 // The built-in validate package passes *ast.File for custom validators.

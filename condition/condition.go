@@ -766,7 +766,7 @@ func callCustomOperator(op string, reg *extension.Registry, fn extension.Operato
 			err = fmt.Errorf("operator %q panicked: %v", op, r)
 		}
 	}()
-	return fn(left, right), nil
+	return fn(left, right)
 }
 
 // lookup walks a dot-separated path through an EvalContext map.
@@ -830,7 +830,7 @@ func floatEqual(a, b float64) bool {
 	// Example: 0.2 + 0.1 = 0.30000000000000004 (without epsilon)
 	// Example: 0.2 + 0.1 = 0.3 (with epsilon)
 	// https://en.wikipedia.org/wiki/Machine_epsilon
-	return math.Abs(a-b) <= epsilon * math.Max(math.Abs(a), math.Abs(b))
+	return math.Abs(a-b) <= epsilon*math.Max(math.Abs(a), math.Abs(b))
 }
 
 // equalityCompatible reports whether eq/neq operands have compatible runtime types.
