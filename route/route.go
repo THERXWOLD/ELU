@@ -9,8 +9,10 @@ import (
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
+	"github.com/therxwold/elu/diag"
 	"github.com/therxwold/elu/extension"
 	"github.com/therxwold/elu/internal/glob"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
 	"github.com/therxwold/elu/value"
 )
@@ -55,58 +57,65 @@ type Decision struct {
 }
 
 // Decode parses an AST into a validated route_policy.
+// Returns all errors at once via diag.Diagnostics.
 func Decode(f *ast.File) (*Policy, error) {
 	if f == nil {
-		return nil, fmt.Errorf("Decode requires non-nil ast.File")
+		return nil, diag.Diagnostics{{Severity: diag.Error, Message: "Decode requires non-nil ast.File"}}
 	}
 	if f.Type != "route_policy" {
-		return nil, fmt.Errorf("expected route_policy, got %q", f.Type)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("expected route_policy, got %q", f.Type)}}
 	}
 	var block *ast.Node
 	for _, n := range f.Nodes {
 		if n.Kind == ast.NodeBlock && n.Key == "routes" {
 			if block != nil {
-				return nil, fmt.Errorf("route_policy allows exactly one routes block")
+				return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "route_policy allows exactly one routes block"}}
 			}
 			block = n
 			continue
 		}
-		return nil, fmt.Errorf("unexpected top-level %s %q at line %d in route_policy", n.Kind, n.Key, n.Line)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level %s %q in route_policy", n.Kind, n.Key)}}
 	}
 	if block == nil {
-		return nil, fmt.Errorf("route_policy requires routes block")
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "route_policy requires routes block"}}
 	}
 	p := &Policy{PackID: f.PackID, Version: f.Version, Name: block.Name, Default: policy.EffectDeny}
+	var diags diag.Diagnostics
 	seenTop := map[string]bool{}
 	seenRoutes := map[string]bool{}
 	for _, child := range block.Children {
 		switch child.Kind {
 		case ast.NodeAssign:
 			if child.Key != "default" {
-				return nil, fmt.Errorf("unknown routes assignment %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown routes assignment %q", child.Key)})
+				continue
 			}
 			if seenTop[child.Key] {
-				return nil, fmt.Errorf("duplicate routes assignment %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate routes assignment %q", child.Key)})
+				continue
 			}
 			seenTop[child.Key] = true
 			p.Default = policy.Effect(child.Value.StringValue())
 			if !policy.IsEffect(string(p.Default)) {
-				return nil, fmt.Errorf("invalid route default effect %q", p.Default)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("invalid route default effect %q", p.Default)})
 			}
 		case ast.NodeSection:
 			if seenTop[child.Key] {
-				return nil, fmt.Errorf("duplicate routes section %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate routes section %q", child.Key)})
+				continue
 			}
 			seenTop[child.Key] = true
 			switch child.Key {
 			case "public":
 				rs, err := decodeRouteList(child, policy.EffectAllow, false)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				for _, r := range rs {
 					if seenRoutes[r.Name] {
-						return nil, fmt.Errorf("duplicate route %q", r.Name)
+						diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate route %q", r.Name)})
+						continue
 					}
 					seenRoutes[r.Name] = true
 					p.Routes = append(p.Routes, r)
@@ -114,37 +123,45 @@ func Decode(f *ast.File) (*Policy, error) {
 			case "protected":
 				rs, err := decodeRouteList(child, policy.EffectAllow, true)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				for _, r := range rs {
 					if seenRoutes[r.Name] {
-						return nil, fmt.Errorf("duplicate route %q", r.Name)
+						diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate route %q", r.Name)})
+						continue
 					}
 					seenRoutes[r.Name] = true
 					p.Routes = append(p.Routes, r)
 				}
 			default:
-				return nil, fmt.Errorf("unknown routes section %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown routes section %q", child.Key)})
 			}
 		case ast.NodeBlock:
 			if child.Key != "route" {
-				return nil, fmt.Errorf("unknown routes block %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown routes block %q", child.Key)})
+				continue
 			}
 			r, err := decodeRouteBlock(child, child.Name, policy.Effect(""))
 			if err != nil {
-				return nil, err
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+				continue
 			}
 			if seenRoutes[r.Name] {
-				return nil, fmt.Errorf("duplicate route %q", r.Name)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate route %q", r.Name)})
+				continue
 			}
 			seenRoutes[r.Name] = true
 			p.Routes = append(p.Routes, r)
 		default:
-			return nil, fmt.Errorf("invalid child in routes block at line %d", child.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: "invalid child in routes block"})
 		}
 	}
 	if err := validateRouteConflicts(p.Routes); err != nil {
-		return nil, err
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: err.Error()})
+	}
+	if diags.HasErrors() {
+		return nil, diags
 	}
 	return p, nil
 }
@@ -263,39 +280,50 @@ func decodeRouteFields(children []*ast.Node, name string, defaultEffect policy.E
 }
 
 // ValidatePolicy checks that a route_policy has valid routes and operator references.
+// Returns all errors at once via diag.Diagnostics.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 	if p == nil {
-		return fmt.Errorf("ValidatePolicy requires non-nil Policy")
+		return diag.Diagnostics{{Severity: diag.Error, Message: "ValidatePolicy requires non-nil Policy"}}
 	}
+	var diags diag.Diagnostics
 	if !policy.IsEffect(string(p.Default)) {
-		return fmt.Errorf("invalid default effect %q", p.Default)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("invalid default effect %q", p.Default)})
 	}
 	if len(p.Routes) == 0 {
-		return fmt.Errorf("route_policy requires at least one route")
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "route_policy requires at least one route"})
 	}
 	for _, r := range p.Routes {
 		if r.Method == "" {
-			return fmt.Errorf("route %q has empty method", r.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("route %q has empty method", r.Name)})
+			continue
 		}
 		if r.Path == "" {
-			return fmt.Errorf("route %q has empty path", r.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("route %q has empty path", r.Name)})
+			continue
 		}
 		if !isValidRoutePath(r.Path) {
-			return fmt.Errorf("route %q has invalid path %q", r.Name, r.Path)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("route %q has invalid path %q", r.Name, r.Path)})
+			continue
 		}
 		if r.Require2FA && r.RequireRole == "" {
-			return fmt.Errorf("route %q require_2fa requires require_role", r.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("route %q require_2fa requires require_role", r.Name)})
 		}
 		if !policy.IsEffect(string(r.Effect)) {
-			return fmt.Errorf("route %q has invalid effect %q", r.Name, r.Effect)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("route %q has invalid effect %q", r.Name, r.Effect)})
 		}
 		if r.Condition != nil {
 			if err := condition.ValidateOperators(*r.Condition, reg); err != nil {
-				return fmt.Errorf("route %q has invalid condition: %w", r.Name, err)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("route %q has invalid condition: %v", r.Name, err)})
 			}
 		}
 	}
-	return validateRouteConflicts(p.Routes)
+	if err := validateRouteConflicts(p.Routes); err != nil {
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
+	}
+	if diags.HasErrors() {
+		return diags
+	}
+	return nil
 }
 
 // Evaluate runs a request through the route policy and returns a decision.
@@ -324,7 +352,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		}
 		// Once method and path match, authorization failures must not fall
 		// through to a more permissive policy default.
-		if r.RequireRole != "" && !hasRole(req.Roles, r.RequireRole) {
+		if r.RequireRole != "" && !util.HasRole(req.Roles, r.RequireRole) {
 			matched = append(matched, r.Name)
 			audit = audit || r.Audit
 			decision = strongerEffect(decision, policy.EffectDeny)
@@ -368,16 +396,6 @@ func strongerEffect(current, candidate policy.Effect) policy.Effect {
 		return candidate
 	}
 	return current
-}
-
-// hasRole checks if a role is in a list of roles.
-func hasRole(roles []string, role string) bool {
-	for _, r := range roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
 }
 
 // isHTTPMethod checks if a string is a valid HTTP method.

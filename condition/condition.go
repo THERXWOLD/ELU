@@ -766,7 +766,7 @@ func callCustomOperator(op string, reg *extension.Registry, fn extension.Operato
 			err = fmt.Errorf("operator %q panicked: %v", op, r)
 		}
 	}()
-	return fn(left, right), nil
+	return fn(left, right)
 }
 
 // lookup walks a dot-separated path through an EvalContext map.
@@ -808,12 +808,23 @@ func lookupMapKey(container any, key string) (any, bool) {
 
 // compareEqual checks deep equality between two values.
 // Numbers are compared as float64 with an epsilon tolerance,
-// everything else uses reflect.DeepEqual.
+// strings and bools use direct comparison, everything else
+// falls back to reflect.DeepEqual.
 func compareEqual(a, b any) bool {
 	if af, ok := number(a); ok {
 		if bf, ok := number(b); ok {
 			return floatEqual(af, bf)
 		}
+	}
+	switch av := a.(type) {
+	case string:
+		bv, ok := b.(string)
+		return ok && av == bv
+	case bool:
+		bv, ok := b.(bool)
+		return ok && av == bv
+	case nil:
+		return b == nil
 	}
 	return reflect.DeepEqual(a, b)
 }
@@ -830,7 +841,7 @@ func floatEqual(a, b float64) bool {
 	// Example: 0.2 + 0.1 = 0.30000000000000004 (without epsilon)
 	// Example: 0.2 + 0.1 = 0.3 (with epsilon)
 	// https://en.wikipedia.org/wiki/Machine_epsilon
-	return math.Abs(a-b) <= epsilon * math.Max(math.Abs(a), math.Abs(b))
+	return math.Abs(a-b) <= epsilon*math.Max(math.Abs(a), math.Abs(b))
 }
 
 // equalityCompatible reports whether eq/neq operands have compatible runtime types.

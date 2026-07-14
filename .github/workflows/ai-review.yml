@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: Spyced-Concepts/ReviewSentry@v0.3.3-beta
+      - uses: Spyced-Concepts/ReviewSentry@cc0ff9f039146dcfa72f1d5e2460881213002cf4 # v0.3.5-beta
         with:
           ai_api_key:   ${{ secrets.GITHUB_TOKEN }}
           ai_model:     gpt-4.1

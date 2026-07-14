@@ -16,15 +16,28 @@ import (
 )
 
 const (
-	maxInputSize = 10 * 1024 * 1024 // 10 MB
-	maxNesting   = 100
+	maxInputSize  = 10 * 1024 * 1024 // 10 MB
+	maxNesting    = 100
+	maxListItems  = 10_000
+	maxTotalNodes = 500_000
 )
 
+// Options configures parser limits.
+type Options struct {
+	MaxListItems  int
+	MaxTotalNodes int
+}
+
+// DefaultOptions returns the default parser limits.
+func DefaultOptions() Options {
+	return Options{MaxListItems: maxListItems, MaxTotalNodes: maxTotalNodes}
+}
+
 var (
-	packRE  = regexp.MustCompile(`^pack\s+"([^"]+)"\s+version\s+([0-9]+)\s*$`)
-	keyRE   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
-	blockRE = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_.-]*)\s+"([^"]+)"\s*:\s*$`)
-	sectRE  = regexp.MustCompile(`^((?:[A-Za-z_][A-Za-z0-9_.-]*)|\*|"[^"]+")\s*:\s*$`)
+	packRE  *regexp.Regexp
+	keyRE   *regexp.Regexp
+	blockRE *regexp.Regexp
+	sectRE  *regexp.Regexp
 )
 
 // parsedLine holds one non-empty, non-comment line from an .elu file.
@@ -35,18 +48,58 @@ type parsedLine struct {
 	line   int
 }
 
+// init initializes the regexes used by the parser.
+func init() {
+	// Check regexes at init time to avoid panics later.
+	// If it works it works
+	var err error
+	packRE, err = regexp.Compile(`^pack\s+"([^"]+)"\s+version\s+([0-9]+)\s*$`)
+	if err != nil {
+		panic("elu.parser: bad pack regex: " + err.Error())
+	}
+	keyRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+	if err != nil {
+		panic("elu.parser: bad key regex: " + err.Error())
+	}
+	blockRE, err = regexp.Compile(`^([A-Za-z_][A-Za-z0-9_.-]*)\s+"([^"]+)"\s*:\s*$`)
+	if err != nil {
+		panic("elu.parser: bad block regex: " + err.Error())
+	}
+	sectRE, err = regexp.Compile(`^((?:[A-Za-z_][A-Za-z0-9_.-]*)|\*|"[^"]+")\s*:\s*$`)
+	if err != nil {
+		panic("elu.parser: bad section regex: " + err.Error())
+	}
+}
+
 // ParseFile reads a file from disk and parses it into an AST.
 func ParseFile(path string) (*ast.File, error) {
+	return ParseFileWithOptions(path, DefaultOptions())
+}
+
+// ParseFileWithOptions reads a file from disk and parses it with custom limits.
+func ParseFileWithOptions(path string, opts Options) (*ast.File, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return ParseString(path, string(b))
+	return ParseStringWithOptions(path, string(b), opts)
 }
 
 // ParseString parses an ELU document from a string.
 // Returns diagnostics as error if there are parse errors.
 func ParseString(path, src string) (*ast.File, error) {
+	return ParseStringWithOptions(path, src, DefaultOptions())
+}
+
+// ParseStringWithOptions parses an ELU document with custom parser limits.
+func ParseStringWithOptions(path, src string, opts Options) (*ast.File, error) {
+	if opts.MaxListItems <= 0 {
+		opts.MaxListItems = maxListItems
+	}
+	if opts.MaxTotalNodes <= 0 {
+		opts.MaxTotalNodes = maxTotalNodes
+	}
+
 	lines, diags := scanLines(path, src)
 	if diags.HasErrors() {
 		return nil, diags
@@ -62,13 +115,11 @@ func ParseString(path, src string) (*ast.File, error) {
 	if m == nil {
 		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: `expected pack header: pack "id" version N`}}
 	}
-	// Parse the version number and create the AST file node.
 	version, err := strconv.Atoi(m[2])
 	if err != nil {
 		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: fmt.Sprintf("invalid version number: %v", err)}}
 	}
 
-	// Reject version numbers less than 1, since we don't support them.
 	if version < 1 {
 		return nil, diag.Diagnostics{{Severity: diag.Error, File: path, Line: lines[0].line, Column: 1, Message: fmt.Sprintf("unsupported version number: %d", version)}}
 	}
@@ -97,6 +148,7 @@ func ParseString(path, src string) (*ast.File, error) {
 	root := &ast.Node{Kind: ast.NodeSection, Key: "$root", Children: []*ast.Node{typNode}}
 	stack := []frame{{indent: -2, node: root}}
 
+	nodeCount := 2 // pack header + type assignment already counted
 	var out diag.Diagnostics
 	for i := 2; i < len(lines); i++ {
 		pl := lines[i]
@@ -119,6 +171,23 @@ func ParseString(path, src string) (*ast.File, error) {
 		}
 		if parent.node.Kind == ast.NodeListItem && (parent.node.Value.Kind != "" || parent.node.Expr != "") {
 			out = append(out, diag.Diagnostic{Severity: diag.Error, File: path, Line: pl.line, Column: pl.indent + 1, Message: "scalar list item cannot have nested children"})
+			continue
+		}
+		if n.Kind == ast.NodeListItem {
+			listCount := 0
+			for _, c := range parent.node.Children {
+				if c.Kind == ast.NodeListItem {
+					listCount++
+				}
+			}
+			if listCount >= opts.MaxListItems {
+				out = append(out, diag.Diagnostic{Severity: diag.Error, File: path, Line: pl.line, Column: pl.indent + 1, Message: fmt.Sprintf("list exceeds maximum of %d items", opts.MaxListItems)})
+				continue
+			}
+		}
+		nodeCount++
+		if nodeCount > opts.MaxTotalNodes {
+			out = append(out, diag.Diagnostic{Severity: diag.Error, File: path, Line: pl.line, Column: pl.indent + 1, Message: fmt.Sprintf("document exceeds maximum of %d nodes", opts.MaxTotalNodes)})
 			continue
 		}
 		parent.node.Children = append(parent.node.Children, n)

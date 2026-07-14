@@ -8,8 +8,9 @@ import (
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
+	"github.com/therxwold/elu/diag"
 	"github.com/therxwold/elu/extension"
-	"github.com/therxwold/elu/internal/glob"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
 	"github.com/therxwold/elu/value"
 )
@@ -46,73 +47,97 @@ type Decision struct {
 	Errors       []string
 }
 
+// actionTokenRE validates action tokens.
+var actionTokenRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	actionTokenRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
+	if err != nil {
+		panic("elu.repo: failed to compile action token regex: " + err.Error())
+	}
+}
+
 // Decode parses an AST into a validated repo_policy.
+// Returns all errors at once via diag.Diagnostics.
 func Decode(f *ast.File) (*Policy, error) {
 	if f == nil {
-		return nil, fmt.Errorf("Decode requires non-nil ast.File")
+		return nil, diag.Diagnostics{{Severity: diag.Error, Message: "Decode requires non-nil ast.File"}}
 	}
 	if f.Type != "repo_policy" {
-		return nil, fmt.Errorf("expected repo_policy, got %q", f.Type)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("expected repo_policy, got %q", f.Type)}}
 	}
 	var block *ast.Node
 	for _, n := range f.Nodes {
 		if n.Kind == ast.NodeBlock && n.Key == "repo" {
 			if block != nil {
-				return nil, fmt.Errorf("repo_policy allows exactly one repo block")
+				return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "repo_policy allows exactly one repo block"}}
 			}
 			block = n
 			continue
 		}
-		return nil, fmt.Errorf("unexpected top-level %s %q at line %d in repo_policy", n.Kind, n.Key, n.Line)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level %s %q in repo_policy", n.Kind, n.Key)}}
 	}
 	if block == nil {
-		return nil, fmt.Errorf("repo_policy requires repo block")
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: "repo_policy requires repo block"}}
 	}
 	p := &Policy{PackID: f.PackID, Version: f.Version, Name: block.Name, Default: map[string]policy.Effect{}}
+	var diags diag.Diagnostics
 	seenRules := map[string]bool{}
 	seenSections := map[string]bool{}
 	for _, child := range block.Children {
 		switch child.Kind {
 		case ast.NodeSection:
 			if seenSections[child.Key] {
-				return nil, fmt.Errorf("repo %q has duplicate section %q at line %d", block.Name, child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("repo %q has duplicate section %q", block.Name, child.Key)})
+				continue
 			}
 			seenSections[child.Key] = true
 			switch {
 			case child.Key == "default":
 				defs, err := decodeDefault(child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Default = defs
 			case policy.IsEffect(child.Key):
 				rules, err := decodeEffectSection(policy.Effect(child.Key), child)
 				if err != nil {
-					return nil, err
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+					continue
 				}
 				p.Rules = append(p.Rules, rules...)
 			default:
 				if child.Key == "" {
-					return nil, fmt.Errorf("empty section key at line %d", child.Line)
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: "empty section key"})
+				} else {
+					diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown repo section %q", child.Key)})
 				}
-				return nil, fmt.Errorf("unknown repo section %q at line %d", child.Key, child.Line)
 			}
 		case ast.NodeBlock:
 			if child.Key != "rule" {
-				return nil, fmt.Errorf("unknown repo block %q at line %d", child.Key, child.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("unknown repo block %q", child.Key)})
+				continue
 			}
 			r, err := decodeExplicitRule(child)
 			if err != nil {
-				return nil, err
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: err.Error()})
+				continue
 			}
 			if seenRules[r.Name] {
-				return nil, fmt.Errorf("duplicate repo rule %q", r.Name)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: fmt.Sprintf("duplicate repo rule %q", r.Name)})
+				continue
 			}
 			seenRules[r.Name] = true
 			p.Rules = append(p.Rules, r)
 		default:
-			return nil, fmt.Errorf("invalid child in repo block at line %d", child.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: child.Line, Message: "invalid child in repo block"})
 		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
 	}
 	return p, nil
 }
@@ -154,7 +179,7 @@ func decodeEffectSection(effect policy.Effect, sec *ast.Node) ([]Rule, error) {
 		if actionSec.Key == "" {
 			return nil, fmt.Errorf("empty action in effect section %q", sec.Key)
 		}
-		if !isValidActionToken(actionSec.Key) {
+		if !util.IsValidActionToken(actionSec.Key) {
 			return nil, fmt.Errorf("invalid action %q in effect section %q at line %d", actionSec.Key, sec.Key, actionSec.Line)
 		}
 		if len(actionSec.Children) == 0 {
@@ -224,7 +249,7 @@ func decodeExplicitRule(n *ast.Node) (Rule, error) {
 	if !seen["action"] || r.Action == "" {
 		return r, fmt.Errorf("rule %q is missing required field action", r.Name)
 	}
-	if !isValidActionToken(r.Action) {
+	if !util.IsValidActionToken(r.Action) {
 		return r, fmt.Errorf("rule %q has invalid action %q", r.Name, r.Action)
 	}
 	if !seen["resource"] || r.Resource == "" {
@@ -234,33 +259,41 @@ func decodeExplicitRule(n *ast.Node) (Rule, error) {
 }
 
 // ValidatePolicy checks that a repo policy has valid defaults, rules, and operators.
+// Returns all errors at once via diag.Diagnostics.
 func ValidatePolicy(p *Policy, reg *extension.Registry) error {
 	if p == nil {
-		return fmt.Errorf("ValidatePolicy requires non-nil Policy")
+		return diag.Diagnostics{{Severity: diag.Error, Message: "ValidatePolicy requires non-nil Policy"}}
 	}
+	var diags diag.Diagnostics
 	for action, effect := range p.Default {
 		if action == "" {
-			return fmt.Errorf("default action must not be empty")
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "default action must not be empty"})
+			continue
 		}
 		if !policy.IsEffect(string(effect)) {
-			return fmt.Errorf("invalid default effect %q", effect)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("invalid default effect %q", effect)})
 		}
 	}
 	for _, r := range p.Rules {
 		if !policy.IsEffect(string(r.Effect)) {
-			return fmt.Errorf("rule %q has invalid effect %q", r.Name, r.Effect)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("rule %q has invalid effect %q", r.Name, r.Effect)})
 		}
 		if r.Action == "" {
-			return fmt.Errorf("rule %q has empty action", r.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("rule %q has empty action", r.Name)})
+			continue
 		}
 		if r.Resource == "" {
-			return fmt.Errorf("rule %q has empty resource", r.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("rule %q has empty resource", r.Name)})
+			continue
 		}
 		if r.Condition != nil {
 			if err := condition.ValidateOperators(*r.Condition, reg); err != nil {
-				return fmt.Errorf("rule %q has invalid condition: %w", r.Name, err)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("rule %q has invalid condition: %v", r.Name, err)})
 			}
 		}
+	}
+	if diags.HasErrors() {
+		return diags
 	}
 	return nil
 }
@@ -283,10 +316,10 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		ctx["resource"] = req.Resource
 	}
 	for _, r := range p.Rules {
-		if !matchAction(r.Action, req.Action) {
+		if !util.MatchAction(r.Action, req.Action) {
 			continue
 		}
-		if !matchResource(r.Resource, req.Resource) {
+		if !util.MatchResource(r.Resource, req.Resource) {
 			continue
 		}
 		if r.Condition != nil {
@@ -320,25 +353,4 @@ func (p *Policy) defaultFor(action string) policy.Effect {
 		}
 	}
 	return policy.EffectDeny
-}
-
-// matchAction checks if a pattern matches an action.
-func matchAction(pattern, val string) bool {
-	return pattern == "*" || pattern == val
-}
-
-// matchResource checks if a resource pattern matches a value.
-func matchResource(pattern, val string) bool {
-	if pattern == "*" || pattern == val {
-		return true
-	}
-	return glob.Match(pattern, val)
-}
-
-// actionTokenRE validates action tokens.
-var actionTokenRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
-
-// isValidActionToken checks if a string is a valid action token or wildcard.
-func isValidActionToken(action string) bool {
-	return action == "*" || actionTokenRE.MatchString(action)
 }

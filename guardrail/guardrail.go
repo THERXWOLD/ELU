@@ -6,8 +6,9 @@ import (
 	"fmt"
 
 	"github.com/therxwold/elu/ast"
+	"github.com/therxwold/elu/diag"
+	"github.com/therxwold/elu/internal/util"
 	"github.com/therxwold/elu/policy"
-	"github.com/therxwold/elu/value"
 )
 
 // Pack is a decoded guardrail_pack.
@@ -30,46 +31,61 @@ type Guardrail struct {
 }
 
 // Decode parses an AST into a validated guardrail_pack.
+// Returns all errors at once via diag.Diagnostics.
 func Decode(f *ast.File) (*Pack, error) {
 	if f.Type != "guardrail_pack" {
-		return nil, fmt.Errorf("expected guardrail_pack, got %q", f.Type)
+		return nil, diag.Diagnostics{{Severity: diag.Error, File: f.Path, Message: fmt.Sprintf("expected guardrail_pack, got %q", f.Type)}}
 	}
 	p := &Pack{PackID: f.PackID, Version: f.Version}
+	var diags diag.Diagnostics
 	seenNames := map[string]bool{}
 	seenTopAssign := map[string]bool{}
 	for _, n := range f.Nodes {
 		switch n.Kind {
 		case ast.NodeAssign:
 			if seenTopAssign[n.Key] {
-				return nil, fmt.Errorf("duplicate top-level field %q at line %d", n.Key, n.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("duplicate top-level field %q", n.Key)})
+				continue
 			}
 			seenTopAssign[n.Key] = true
 			if n.Key != "priority" {
-				return nil, fmt.Errorf("unknown top-level field %q at line %d in guardrail_pack", n.Key, n.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unknown top-level field %q in guardrail_pack", n.Key)})
+				continue
 			}
 			p.Priority = n.Value.StringValue()
 		case ast.NodeBlock:
 			if n.Key != "guardrail" {
-				return nil, fmt.Errorf("unexpected top-level block %q at line %d in guardrail_pack", n.Key, n.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level block %q in guardrail_pack", n.Key)})
+				continue
 			}
 			if n.Name == "" {
-				return nil, fmt.Errorf("guardrail block at line %d requires a name", n.Line)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: "guardrail block requires a name"})
+				continue
 			}
 			if seenNames[n.Name] {
-				return nil, fmt.Errorf("duplicate guardrail %q", n.Name)
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("duplicate guardrail %q", n.Name)})
+				continue
 			}
 			seenNames[n.Name] = true
 			g, err := decodeGuardrail(n)
 			if err != nil {
-				return nil, err
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: err.Error()})
+				continue
 			}
 			p.Guardrails = append(p.Guardrails, g)
 		default:
-			return nil, fmt.Errorf("unexpected top-level %s %q at line %d in guardrail_pack", n.Kind, n.Key, n.Line)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Line: n.Line, Message: fmt.Sprintf("unexpected top-level %s %q in guardrail_pack", n.Kind, n.Key)})
 		}
 	}
 	if err := Validate(p); err != nil {
-		return nil, err
+		if d, ok := err.(diag.Diagnostics); ok {
+			diags = append(diags, d...)
+		} else {
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: err.Error()})
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
 	}
 	return p, nil
 }
@@ -96,19 +112,19 @@ func decodeGuardrail(n *ast.Node) (Guardrail, error) {
 			seen[child.Key] = true
 			switch child.Key {
 			case "applies_to":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return g, err
 				}
 				g.AppliesTo = xs
 			case "never":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return g, err
 				}
 				g.Never = xs
 			case "never_edit":
-				xs, err := stringList(child)
+				xs, err := util.StringList(child)
 				if err != nil {
 					return g, err
 				}
@@ -136,29 +152,36 @@ func decodeGuardrail(n *ast.Node) (Guardrail, error) {
 }
 
 // Validate checks that a guardrail_pack has valid structure and coherent rules.
+// Returns all errors at once via diag.Diagnostics.
 func Validate(p *Pack) error {
+	var diags diag.Diagnostics
 	if p.Priority != "" && !policy.IsSeverity(p.Priority) {
-		return fmt.Errorf("invalid guardrail pack priority %q", p.Priority)
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("invalid guardrail pack priority %q", p.Priority)})
 	}
 	if len(p.Guardrails) == 0 {
-		return fmt.Errorf("guardrail_pack requires at least one guardrail")
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "guardrail_pack requires at least one guardrail"})
 	}
 	for _, g := range p.Guardrails {
 		if g.Name == "" {
-			return fmt.Errorf("guardrail name must not be empty")
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: "guardrail name must not be empty"})
+			continue
 		}
 		if g.Severity == "" {
-			return fmt.Errorf("guardrail %q is missing required field severity", g.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("guardrail %q is missing required field severity", g.Name)})
+			continue
 		}
 		if !policy.IsSeverity(g.Severity) {
-			return fmt.Errorf("guardrail %q has invalid severity %q", g.Name, g.Severity)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("guardrail %q has invalid severity %q", g.Name, g.Severity)})
 		}
 		if len(g.Never) == 0 && len(g.NeverEdit) == 0 && len(g.RequiresApproval) == 0 {
-			return fmt.Errorf("guardrail %q must define never, never_edit, or requires_approval", g.Name)
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: fmt.Sprintf("guardrail %q must define never, never_edit, or requires_approval", g.Name)})
 		}
 		if err := validateOnViolation(g.Name, g.Severity, g.OnViolation); err != nil {
-			return err
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		}
+	}
+	if diags.HasErrors() {
+		return diags
 	}
 	return nil
 }
@@ -214,29 +237,6 @@ func isViolationAction(action string) bool {
 	}
 }
 
-// stringList extracts a list of strings from a section node.
-func stringList(sec *ast.Node) ([]string, error) {
-	if len(sec.Children) == 0 {
-		return nil, fmt.Errorf("section %q at line %d must not be empty", sec.Key, sec.Line)
-	}
-	var out []string
-	seen := map[string]bool{}
-	for _, item := range sec.Children {
-		if item.Kind != ast.NodeListItem || item.Value.Kind != value.String || len(item.Children) != 0 {
-			return nil, fmt.Errorf("section %q at line %d expects string list items", sec.Key, item.Line)
-		}
-		if item.Value.S == "" {
-			return nil, fmt.Errorf("section %q has empty item at line %d", sec.Key, item.Line)
-		}
-		if seen[item.Value.S] {
-			return nil, fmt.Errorf("section %q has duplicate item %q", sec.Key, item.Value.S)
-		}
-		seen[item.Value.S] = true
-		out = append(out, item.Value.S)
-	}
-	return out, nil
-}
-
 // actionMap extracts a map of action → string list from a section node.
 func actionMap(sec *ast.Node) (map[string][]string, error) {
 	out := map[string][]string{}
@@ -247,7 +247,10 @@ func actionMap(sec *ast.Node) (map[string][]string, error) {
 		if _, ok := out[child.Key]; ok {
 			return nil, fmt.Errorf("duplicate action section %q at line %d", child.Key, child.Line)
 		}
-		xs, err := stringList(child)
+		if !util.IsValidActionToken(child.Key) {
+			return nil, fmt.Errorf("invalid action key %q at line %d", child.Key, child.Line)
+		}
+		xs, err := util.StringList(child)
 		if err != nil {
 			return nil, err
 		}

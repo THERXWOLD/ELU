@@ -27,8 +27,8 @@ func TestConditionMissingAndCustomOperator(t *testing.T) {
 	}
 
 	reg := extension.NewRegistry()
-	err = reg.RegisterOperator("within_cidr", func(left any, right any) bool {
-		return left == "10.1.2.3" && right == "10.0.0.0/8"
+	err = reg.RegisterOperator("within_cidr", func(left any, right any) (bool, error) {
+		return left == "10.1.2.3" && right == "10.0.0.0/8", nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -324,7 +324,7 @@ func TestContainsSupportsMapKeys(t *testing.T) {
 
 func TestCustomOperatorPanicReturnsError(t *testing.T) {
 	reg := extension.NewRegistry()
-	err := reg.RegisterOperator("boom", func(left any, right any) bool {
+	err := reg.RegisterOperator("boom", func(left any, right any) (bool, error) {
 		panic("boom")
 	})
 	if err != nil {

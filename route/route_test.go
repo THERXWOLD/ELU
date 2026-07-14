@@ -135,7 +135,7 @@ routes "site":
 		t.Fatal("expected validation error without custom operator")
 	}
 	reg := extension.NewRegistry()
-	reg.RegisterOperator("within_cidr", func(left, right any) bool { return left == "10.1.2.3" && right == "10.0.0.0/8" })
+	reg.RegisterOperator("within_cidr", func(left, right any) (bool, error) { return left == "10.1.2.3" && right == "10.0.0.0/8", nil })
 	if err := route.ValidatePolicy(p, reg); err != nil {
 		t.Fatalf("expected validation with registered operator: %v", err)
 	}

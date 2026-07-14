@@ -42,3 +42,28 @@ func TestNormalizeCleansDots(t *testing.T) {
 		}
 	}
 }
+
+func TestGlobCacheHitReturnsSameResult(t *testing.T) {
+	r1, err1 := globRegexp("*.go")
+	r2, err2 := globRegexp("*.go")
+	if err1 != nil || err2 != nil {
+		t.Fatalf("unexpected errors: %v, %v", err1, err2)
+	}
+	if r1 != r2 {
+		t.Fatal("expected cache hit to return same *regexp.Regexp pointer")
+	}
+}
+
+func TestGlobCacheMissCompilesFresh(t *testing.T) {
+	r1, _ := globRegexp("*.go")
+	r2, _ := globRegexp("*.md")
+	if r1 == r2 {
+		t.Fatal("expected different patterns to produce different regexp pointers")
+	}
+}
+
+func TestMatchInvalidPatternReturnsFalse(t *testing.T) {
+	if Match("*invalid", "anything") {
+		t.Fatal("expected invalid pattern to return false")
+	}
+}

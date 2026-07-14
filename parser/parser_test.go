@@ -1,6 +1,8 @@
 package parser_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/therxwold/elu/ast"
@@ -166,5 +168,120 @@ access "site":
 	accessBlock := ast.FindBlock(f.Nodes, "access")
 	if accessBlock == nil {
 		t.Fatal("missing access block")
+	}
+}
+
+func buildHugeList(n int) string {
+	var b strings.Builder
+	b.WriteString(`pack "x" version 1
+type = "access_policy"
+
+access "site":
+  roles:
+`)
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, "    - \"role_%d\"\n", i)
+	}
+	return b.String()
+}
+
+func TestHugeListRejected(t *testing.T) {
+	src := buildHugeList(10_001)
+	_, err := parser.ParseString("big.elu", src)
+	if err == nil {
+		t.Fatal("expected list size error")
+	}
+}
+
+func TestDefaultLimitReasonable(t *testing.T) {
+	src := buildHugeList(9_999)
+	f, err := parser.ParseString("ok.elu", src)
+	if err != nil {
+		t.Fatalf("default limit should allow 9999 items: %v", err)
+	}
+	_ = f
+}
+
+func TestCustomLimitWorks(t *testing.T) {
+	src := buildHugeList(15)
+	opts := parser.Options{MaxListItems: 10}
+	_, err := parser.ParseStringWithOptions("custom.elu", src, opts)
+	if err == nil {
+		t.Fatal("expected custom limit to reject 15 items")
+	}
+}
+
+func TestCustomLimitAllowsUnderLimit(t *testing.T) {
+	src := buildHugeList(10)
+	opts := parser.Options{MaxListItems: 10}
+	f, err := parser.ParseStringWithOptions("custom.elu", src, opts)
+	if err != nil {
+		t.Fatalf("custom limit should allow exactly 10 items: %v", err)
+	}
+	_ = f
+}
+
+func buildHugeDoc(nodes int) string {
+	var b strings.Builder
+	b.WriteString(`pack "x" version 1
+type = "access_policy"
+
+`)
+	for i := 0; i < nodes; i++ {
+		fmt.Fprintf(&b, "key_%d = \"val\"\n", i)
+	}
+	return b.String()
+}
+
+func TestTotalNodesRejected(t *testing.T) {
+	src := buildHugeDoc(500_001)
+	_, err := parser.ParseString("big.elu", src)
+	if err == nil {
+		t.Fatal("expected total nodes error")
+	}
+}
+
+func TestVersionEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     string
+		wantErr string
+	}{
+		{
+			name:    "non-numeric version",
+			src:     "pack \"x\" version abc\ntype = \"access_policy\"\n",
+			wantErr: "expected pack header",
+		},
+		{
+			name:    "version zero",
+			src:     "pack \"x\" version 0\ntype = \"access_policy\"\n",
+			wantErr: "unsupported version number",
+		},
+		{
+			name:    "negative version",
+			src:     "pack \"x\" version -1\ntype = \"access_policy\"\n",
+			wantErr: "expected pack header",
+		},
+		{
+			name:    "overflow version",
+			src:     "pack \"x\" version 9999999999999999999\ntype = \"access_policy\"\n",
+			wantErr: "invalid version number",
+		},
+		{
+			name:    "missing version",
+			src:     "pack \"x\"\ntype = \"access_policy\"\n",
+			wantErr: "expected pack header",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parser.ParseString("version.elu", tt.src)
+			if err == nil {
+				t.Fatalf("expected error containing %q", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+		})
 	}
 }
