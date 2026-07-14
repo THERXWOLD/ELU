@@ -59,3 +59,17 @@ func TestParseScalarLeadingZeroRejected(t *testing.T) {
 		t.Fatal("expected error for leading zero")
 	}
 }
+
+func FuzzParseScalar(f *testing.F) {
+	seeds := []string{
+		`"hello"`, "true", "false", "42", "-1", "3.14", "*", "null",
+		"", " ", `"unterminated`, "042", "9223372036854775808",
+		`"café"`, `"\n"`, `"\x00"`, "abc.def", "a-b_c",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, raw string) {
+		_, _ = value.ParseScalar(raw, 1, 1)
+	})
+}
