@@ -18,6 +18,7 @@ import (
 // optionally gated by a condition, and produces an effect (allow/deny/etc).
 type Rule struct {
 	Name      string
+	// Role is the role this rule applies to. If empty, the rule applies to all roles.
 	Role      string
 	Effect    policy.Effect
 	Action    string
@@ -454,6 +455,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 		ctx["resource.type"] = req.Resource
 	}
 	for _, r := range p.NeverRules {
+		// Skip rules that don't apply to the requesting role.
 		if r.Role != "" && !hasRole(req.Roles, r.Role) {
 			continue
 		}
@@ -476,6 +478,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	}
 	var errs []string
 	for _, r := range p.Rules {
+		// Skip rules that don't apply to the requesting role.
 		if r.Role != "" && !hasRole(req.Roles, r.Role) {
 			continue
 		}
