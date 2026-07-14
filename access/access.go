@@ -17,7 +17,7 @@ import (
 // Rule is a single access control rule. It matches a role, action, and resource,
 // optionally gated by a condition, and produces an effect (allow/deny/etc).
 type Rule struct {
-	Name      string
+	Name string
 	// Role is the role this rule applies to. If empty, the rule applies to all roles.
 	Role      string
 	Effect    policy.Effect
