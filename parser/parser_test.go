@@ -240,3 +240,48 @@ func TestTotalNodesRejected(t *testing.T) {
 		t.Fatal("expected total nodes error")
 	}
 }
+
+func TestVersionEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     string
+		wantErr string
+	}{
+		{
+			name:    "non-numeric version",
+			src:     "pack \"x\" version abc\ntype = \"access_policy\"\n",
+			wantErr: "expected pack header",
+		},
+		{
+			name:    "version zero",
+			src:     "pack \"x\" version 0\ntype = \"access_policy\"\n",
+			wantErr: "unsupported version number",
+		},
+		{
+			name:    "negative version",
+			src:     "pack \"x\" version -1\ntype = \"access_policy\"\n",
+			wantErr: "expected pack header",
+		},
+		{
+			name:    "overflow version",
+			src:     "pack \"x\" version 9999999999999999999\ntype = \"access_policy\"\n",
+			wantErr: "invalid version number",
+		},
+		{
+			name:    "missing version",
+			src:     "pack \"x\"\ntype = \"access_policy\"\n",
+			wantErr: "expected pack header",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parser.ParseString("version.elu", tt.src)
+			if err == nil {
+				t.Fatalf("expected error containing %q", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+		})
+	}
+}
