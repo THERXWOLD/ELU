@@ -51,9 +51,7 @@ func File(f *ast.File, reg *extension.Registry, strict bool) diag.Diagnostics {
 		return diags
 	}
 	implemented := extension.IsImplementedPackType(f.Type)
-	if err := validateImplemented(f, reg); err != nil {
-		diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: err.Error()})
-	}
+	diags = append(diags, validateImplemented(f, reg)...)
 	if fn, ok := reg.Validator(f.Type); ok {
 		if err := runCustomValidator(fn, f); err != nil {
 			diags = append(diags, diag.Diagnostic{Severity: diag.Error, File: f.Path, Message: err.Error()})
@@ -66,35 +64,35 @@ func File(f *ast.File, reg *extension.Registry, strict bool) diag.Diagnostics {
 
 // validateImplemented dispatches to the appropriate pack decoder/validator
 // based on the file's type field.
-func validateImplemented(f *ast.File, reg *extension.Registry) error {
+func validateImplemented(f *ast.File, reg *extension.Registry) diag.Diagnostics {
 	switch f.Type {
 	case "access_policy":
 		p, err := access.Decode(f)
 		if err != nil {
-			return err
+			return wrapDiagnostics(err, f.Path)
 		}
-		return access.ValidatePolicy(p, reg)
+		return wrapDiagnostics(access.ValidatePolicy(p, reg), f.Path)
 	case "skill_pack":
 		_, err := skill.Decode(f)
-		return err
+		return wrapDiagnostics(err, f.Path)
 	case "repo_policy":
 		p, err := repo.Decode(f)
 		if err != nil {
-			return err
+			return wrapDiagnostics(err, f.Path)
 		}
-		return repo.ValidatePolicy(p, reg)
+		return wrapDiagnostics(repo.ValidatePolicy(p, reg), f.Path)
 	case "route_policy":
 		p, err := route.Decode(f)
 		if err != nil {
-			return err
+			return wrapDiagnostics(err, f.Path)
 		}
-		return route.ValidatePolicy(p, reg)
+		return wrapDiagnostics(route.ValidatePolicy(p, reg), f.Path)
 	case "guardrail_pack":
 		_, err := guardrail.Decode(f)
-		return err
+		return wrapDiagnostics(err, f.Path)
 	case "filter_pack":
 		_, err := filter.Decode(f)
-		return err
+		return wrapDiagnostics(err, f.Path)
 	case "behavior_pack", "flow_pack", "memory_pack", "voice_pack", "workflow_policy", "feature_policy", "audit_policy", "dataset_pack", "eval_pack":
 		return nil
 	default:
@@ -110,4 +108,17 @@ func runCustomValidator(fn extension.ValidatorFunc, f *ast.File) (err error) {
 		}
 	}()
 	return fn(f)
+}
+
+// wrapDiagnostics converts an error to diag.Diagnostics.
+// If the error is already diag.Diagnostics, it's returned as-is.
+// If nil, returns nil.
+func wrapDiagnostics(err error, filePath string) diag.Diagnostics {
+	if err == nil {
+		return nil
+	}
+	if d, ok := err.(diag.Diagnostics); ok {
+		return d
+	}
+	return diag.Diagnostics{{Severity: diag.Error, File: filePath, Message: err.Error()}}
 }
