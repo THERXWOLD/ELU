@@ -4,7 +4,9 @@ package access
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
@@ -442,9 +444,9 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 	decision := policy.Effect("")
 	matched := []string{}
 	ctx := condition.EvalContext{}
-	for k, v := range req.Context {
-		ctx[k] = v
-	}
+	// Copy the request context so we can mutate it.
+	maps.Copy(ctx, req.Context)
+
 	ctx["subject.id"] = req.SubjectID
 	ctx["subject.roles"] = req.Roles
 	ctx["request.action"] = req.Action
@@ -511,12 +513,7 @@ func (p *Policy) Evaluate(req Request, reg *extension.Registry) Decision {
 
 // hasRole checks if a role is in a list of roles.
 func hasRole(roles []string, role string) bool {
-	for _, r := range roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(roles, role)
 }
 
 // matchAction checks if a pattern matches an action.
