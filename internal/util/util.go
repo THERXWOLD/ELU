@@ -4,6 +4,7 @@ package util
 import (
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/internal/glob"
@@ -11,7 +12,16 @@ import (
 )
 
 // ActionTokenRE validates action tokens: alphanumeric with some punctuation.
-var ActionTokenRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
+var ActionTokenRE *regexp.Regexp
+
+// init initializes the regexes used by the parser.
+func init() {
+	var err error
+	ActionTokenRE, err = regexp.Compile(`^[a-zA-Z0-9_\-.:]+$`)
+	if err != nil {
+		panic("elu.internal.util: failed to compile action token regex: " + err.Error())
+	}
+}
 
 // IsValidActionToken reports whether s is a valid action token or wildcard.
 func IsValidActionToken(s string) bool {
@@ -20,12 +30,7 @@ func IsValidActionToken(s string) bool {
 
 // HasRole checks if a role is in a list of roles.
 func HasRole(roles []string, role string) bool {
-	for _, r := range roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(roles, role)
 }
 
 // MatchAction checks if a pattern matches an action.

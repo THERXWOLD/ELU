@@ -5,7 +5,6 @@ package access
 import (
 	"fmt"
 	"maps"
-	"regexp"
 
 	"github.com/therxwold/elu/ast"
 	"github.com/therxwold/elu/condition"
@@ -53,18 +52,6 @@ type Decision struct {
 	Effect       policy.Effect
 	MatchedRules []string
 	Errors       []string
-}
-
-// actionTokenRE validates action tokens: alphanumeric with some punctuation.
-var actionTokenRE *regexp.Regexp
-
-// init initializes the regexes used by the parser.
-func init() {
-	var err error
-	actionTokenRE, err = regexp.Compile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
-	if err != nil {
-		panic("elu.access: failed to compile action token regex: " + err.Error())
-	}
 }
 
 // Decode parses an AST into a validated access_policy.
