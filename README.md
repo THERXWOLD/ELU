@@ -36,19 +36,19 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-narukoshin               63 commits          █████████████████░░░░░░░░   69.23 % 
-eluuna461                19 commits          █████░░░░░░░░░░░░░░░░░░░░   20.88 % 
-github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   09.89 % 
+narukoshin               93 commits          ██████████████████░░░░░░░   72.09 % 
+eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   20.93 % 
+github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.98 % 
 ```
 
 🕐 **Recent Commits** 
 
 ```text
 湖心なる: Merge pull request commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-Naru K: fix(condition): rcommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+Naru K: hotfix: removed dcommit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 湖心なる: Merge pull request commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 湖心なる: Merge pull request commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Update AI model frocommit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
