@@ -36,9 +36,9 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-narukoshin               96 commits          ██████████████████░░░░░░░   72.73 % 
-eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   20.45 % 
-github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.82 % 
+narukoshin               97 commits          ██████████████████░░░░░░░   72.93 % 
+eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   20.30 % 
+github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.77 % 
 ```
 
 🕐 **Recent Commits** 
@@ -47,8 +47,8 @@ github-actions[bot]      9 commits           ██░░░░░░░░░�
 narukoshin: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 narukoshin: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 narukoshin: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Merge pull request commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-Naru K: hotfix: removed dcommit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+narukoshin: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+湖心なる: Merge pull request commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
