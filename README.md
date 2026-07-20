@@ -36,9 +36,9 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-narukoshin               97 commits          ██████████████████░░░░░░░   72.93 % 
-eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   20.30 % 
-github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.77 % 
+narukoshin               98 commits          ██████████████████░░░░░░░   73.13 % 
+eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   20.15 % 
+github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.72 % 
 ```
 
 🕐 **Recent Commits** 
@@ -48,7 +48,7 @@ narukoshin: Updated with commit 1            ██░░░░░░░░░�
 narukoshin: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 narukoshin: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 narukoshin: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-湖心なる: Merge pull request commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
+narukoshin: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
 ```
 
 
