@@ -36,9 +36,9 @@ Go                       100.0%              ███████████�
 👥 **Top Contributors** 
 
 ```text
-narukoshin               107 commits         ███████████████████░░░░░░   74.83 % 
-eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   18.88 % 
-github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.29 % 
+narukoshin               108 commits         ███████████████████░░░░░░   75.00 % 
+eluuna461                27 commits          █████░░░░░░░░░░░░░░░░░░░░   18.75 % 
+github-actions[bot]      9 commits           ██░░░░░░░░░░░░░░░░░░░░░░░   06.25 % 
 ```
 
 🕐 **Recent Commits** 
