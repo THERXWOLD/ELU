@@ -2,58 +2,6 @@
 
 *A tiny embeddable policy language — like JSON5 grew up and got a job in security.*
 
-<!--START_SECTION:repo_stats-->
-⭐ **Stars** 
-
-```text
-Total: 1
-```
-
-🍴 **Forks** 
-
-```text
-Total: 0
-```
-
-📋 **Issues** 
-
-```text
-Open: 4
-```
-
-🔀 **Pull Requests** 
-
-```text
-Open: 0
-```
-
-💬 **Languages** 
-
-```text
-Go                       100.0%              █████████████████████████   100.00 % 
-```
-
-👥 **Top Contributors** 
-
-```text
-narukoshin               120 commits         ███████████████████░░░░░░   76.92 % 
-eluuna461                27 commits          ████░░░░░░░░░░░░░░░░░░░░░   17.31 % 
-github-actions[bot]      9 commits           █░░░░░░░░░░░░░░░░░░░░░░░░   05.77 % 
-```
-
-🕐 **Recent Commits** 
-
-```text
-narukoshin: Updated with commit 1            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 2            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 3            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 4            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-narukoshin: Updated with commit 5            ██░░░░░░░░░░░░░░░░░░░░░░░   10.00 % 
-```
-
-
-<!--END_SECTION:repo_stats-->
-
 <img src="https://img.shields.io/badge/go-1.22+-00ADD8?logo=go&logoColor=white"> <img src="https://img.shields.io/badge/status-experimental-orange"> <img src="https://img.shields.io/badge/license-GPLv3-blue"> <img src="https://img.shields.io/badge/PRs-welcome-brightgreen">
 
 > [!WARNING]
