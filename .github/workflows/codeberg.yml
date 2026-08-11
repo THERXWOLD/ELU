@@ -1,0 +1,46 @@
+name: Repo Sync
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create mirror clone
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init --bare mirror.git
+          cd mirror.git
+
+          git remote add source \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git fetch source \
+            '+refs/heads/*:refs/heads/*' \
+            '+refs/tags/*:refs/tags/*'
+
+      - name: Push to Codeberg
+        env:
+          CODEBERG_USER: narukoshin
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+        run: |
+          cd mirror.git
+
+          git remote add codeberg \
+            "https://${CODEBERG_USER}:${CODEBERG_TOKEN}@codeberg.org/therxwold/ELU.git"
+
+          git push --prune codeberg \
+            'refs/heads/*:refs/heads/*' \
+            'refs/tags/*:refs/tags/*'
